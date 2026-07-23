@@ -103,12 +103,68 @@
   .heart { color: var(--pink); transition: color 0.25s ease, transform 0.25s ease; }
   .heart.lost { color: #DDDDE3; transform: scale(0.82); }
 
-  /* leaderboard — top right */
-  #squad-panel {
+  /* top-right controls */
+  #top-controls {
     top: 20px;
     right: 20px;
-    padding: 12px 16px 10px;
-    min-width: 210px;
+    display: flex;
+    gap: 10px;
+  }
+  .icon-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    cursor: pointer;
+    color: var(--ink-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: color 0.2s ease, transform 0.15s ease;
+  }
+  .icon-btn:hover { color: var(--ink); transform: translateY(-1px); }
+  .icon-btn svg { width: 18px; height: 18px; }
+  .share-wrap { position: relative; }
+  .share-tip {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-4px);
+    padding: 5px 11px;
+    border-radius: 8px;
+    background: var(--ink);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  .share-tip.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* standings inside the pause popup */
+  #pause-standings-title {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+  }
+  #pause-standings {
+    margin: 0 auto 18px;
+    max-width: 250px;
+    text-align: left;
+  }
+  .pause-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
   }
   #heat-track {
     width: 64px;
@@ -193,27 +249,6 @@
   }
   @media (pointer: coarse) {
     #controls-panel { display: none; }
-  }
-
-  /* sound — bottom right */
-  #sound-btn {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 10;
-    width: 42px;
-    height: 42px;
-    border-radius: 14px;
-    border: 1px solid var(--glass-border);
-    background: var(--glass);
-    -webkit-backdrop-filter: blur(18px);
-    backdrop-filter: blur(18px);
-    cursor: pointer;
-    font-size: 15px;
-    color: var(--ink-soft);
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
 
   /* respawn chip — center */
@@ -601,8 +636,8 @@
     #score-panel { top: 12px; left: 12px; padding: 8px 14px; gap: 16px; border-radius: 14px; }
     .stat-value { font-size: 16px; }
     #hearts { font-size: 14px; }
-    #squad-panel { top: 12px; right: 12px; padding: 10px 12px 8px; min-width: 160px; border-radius: 14px; }
-    #sound-btn { bottom: 12px; right: 12px; width: 38px; height: 38px; }
+    #top-controls { top: 12px; right: 12px; }
+    .icon-btn { width: 38px; height: 38px; }
     .overlay-card { padding: 26px 24px; }
     .overlay-title { font-size: 22px; }
     .overlay-sub { font-size: 12px; margin-bottom: 14px; }
@@ -636,9 +671,16 @@
   </div>
 </div>
 
-<div class="hud glass" id="squad-panel">
-  <div id="squad-title">Leaderboard</div>
-  <div id="squad-list"></div>
+<div class="hud" id="top-controls">
+  <button class="icon-btn glass" id="pause-btn" aria-label="Pause" title="Pause">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="9" y1="5" x2="9" y2="19"/><line x1="15" y1="5" x2="15" y2="19"/></svg>
+  </button>
+  <div class="share-wrap">
+    <button class="icon-btn glass" id="share-btn" aria-label="Copy invite link" title="Copy invite link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><polyline points="8 7 12 3 16 7"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    </button>
+    <div class="share-tip" id="share-tip">Link copied</div>
+  </div>
 </div>
 
 <div class="hud glass" id="controls-panel">
@@ -651,8 +693,6 @@
 </div>
 
 <div id="toasts"></div>
-
-<button id="sound-btn" title="Toggle sound">&#9704;</button>
 
 <!-- Mode select overlay (room creators only) -->
 <div class="overlay hidden" id="mode-overlay">
@@ -722,6 +762,15 @@
   <div class="overlay-card glass">
     <div class="overlay-kicker">Standby</div>
     <div class="overlay-title">Paused</div>
+    <div id="pause-standings-title">Standings</div>
+    <div id="pause-standings"></div>
+    <div class="pause-actions">
+      <div class="share-wrap">
+        <button class="btn btn-ghost" id="pause-share">Copy invite link</button>
+        <div class="share-tip" id="pause-share-tip">Link copied</div>
+      </div>
+      <button class="btn btn-ghost" id="pause-mute">Mute sound</button>
+    </div>
     <div class="overlay-hint"><span class="pulse">Press any key or tap to resume</span></div>
   </div>
 </div>
@@ -834,12 +883,6 @@
     ready()     { beep('sine', 660, 0.12, 0.07); setTimeout(() => beep('sine', 990, 0.25, 0.07), 130); }
   };
 
-  const soundBtn = document.getElementById('sound-btn');
-  soundBtn.addEventListener('click', () => {
-    soundOn = !soundOn;
-    soundBtn.innerHTML = soundOn ? '&#9704;' : '&#9705;';
-  });
-
   // ------------------------------------------------------------ state
   const keys = {};
   let running = false, paused = false, finished = false;
@@ -921,17 +964,20 @@
 
   // peers[id] = {name, slot, kills, hearts, deaths, alive, x, y, tx, ty, seen, shots: [{x,y,age}]}
   const peers = {};
-  let room = null, net = null, spawnerId = null;
+  let room = null, net = null;
 
   function ensurePeer(id) {
-    if (!peers[id]) {
-      peers[id] = {
+    let p = peers[id];
+    if (!p) {
+      p = peers[id] = {
         name: '· · ·', slot: -1, kills: 0, hearts: 3, deaths: 0, alive: true,
+        playing: false,
         x: -100, y: -100, tx: -100, ty: -100, ang: 0, tAng: 0,
-        hasPos: false, shots: [], labelT: 0
+        hasPos: false, shots: [], labelT: 0, lastSeen: 0
       };
     }
-    return peers[id];
+    p.lastSeen = performance.now(); // any message from a peer marks them alive
+    return p;
   }
   function peerIds() { return Object.keys(peers); }
   function playerCount() { return peerIds().length + 1; }
@@ -947,12 +993,14 @@
   }
   mySlot = pickSlot();
 
-  function electSpawner() {
-    const ids = [...peerIds(), selfId()].sort();
-    spawnerId = ids[0];
-  }
   function selfId() { return window.trystero ? trystero.selfId : 'solo'; }
-  function iAmSpawner() { return spawnerId === selfId(); }
+  // The spawner is the lowest-id pilot who is currently *playing*. Backups
+  // take over when higher-priority spawners go silent (see the spawn loop),
+  // so enemies keep coming even if the primary backgrounds their tab or drops.
+  function playingSpawnerIds() {
+    return [selfId(), ...peerIds().filter(id => peers[id].playing)].sort();
+  }
+  function amPrimarySpawner() { return playingSpawnerIds()[0] === selfId(); }
 
   function myColors() { return SLOT_COLORS[mySlot] || SLOT_COLORS[0]; }
 
@@ -962,7 +1010,18 @@
       return;
     }
     try {
-      room = trystero.joinRoom({ appId: 'anm-holding-pattern-v1' }, roomId);
+      room = trystero.joinRoom({
+        appId: 'anm-holding-pattern-v1',
+        // extra public STUN servers improve direct-connection success across
+        // home routers (all free, no credentials — keeps this fully serverless)
+        rtcConfig: {
+          iceServers: [
+            { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun.cloudflare.com:3478' }
+          ]
+        }
+      }, roomId);
     } catch (e) {
       setRelayStatus(false, 'Offline — flying solo');
       return;
@@ -988,10 +1047,9 @@
     room.onPeerJoin = (id => {
       if (peerIds().length + 1 > MAX_PLAYERS) return; // observers beyond cap are ignored
       ensurePeer(id);
-      electSpawner();
       sendMeta({ n: myName, s: mySlot }, id);
       sendState(myState(), id);
-      if (iAmSpawner()) {
+      if (running && amPrimarySpawner()) {
         for (const e of enemies) {
           const d = { i: e.id, x: e.x / W, y: e.y / H, v: e.speed, b: e.big ? 1 : 0, h: e.hp, m: e.maxHp };
           if (e.vx !== undefined) { d.dx = e.vx / e.speed; d.dy = e.vy / e.speed; }
@@ -1007,7 +1065,6 @@
       const p = peers[id];
       if (p && p.slot >= 0) toast(p.name, 'left the squadron');
       delete peers[id];
-      electSpawner();
       refreshLobby();
       refreshSquad();
     });
@@ -1031,11 +1088,19 @@
     getState((d, id) => {
       if (typeof d !== 'object' || !d) return;
       const p = ensurePeer(id);
+      // state carries identity too, so a peer that dropped and reconnected
+      // (or was pruned) gets its name/color back within one state tick
+      if (p.slot === -1 && d.s !== undefined) {
+        p.slot = Math.max(0, Math.min(SLOT_COLORS.length - 1, d.s | 0));
+        p.name = cleanName(d.n);
+        refreshLobby();
+      }
       p.kills = d.k | 0;
       p.hearts = d.h | 0;
       p.deaths = d.d | 0;
       if (!p.alive && d.a) p.labelT = 2.5; // back from respawn — flash the callsign
       p.alive = !!d.a;
+      p.playing = !!d.p;
       refreshSquad();
     });
 
@@ -1085,8 +1150,6 @@
       }
     });
 
-    electSpawner();
-
     // periodic sends
     setInterval(() => {
       if (!net) return;
@@ -1096,12 +1159,33 @@
     }, 90);
     setInterval(() => { if (net) sendState(myState()); }, 2000);
 
+    // Backstop for abrupt drops: trystero's onPeerLeave fires on a clean
+    // disconnect, but a crashed/force-quit tab can go silent without it. Any
+    // pilot we haven't heard from in PEER_TIMEOUT is dropped, which also frees
+    // their color and lets spawner duty fail over.
+    const PEER_TIMEOUT_MS = 10000;
+    setInterval(() => {
+      const now = performance.now();
+      let changed = false;
+      for (const id of peerIds()) {
+        if (now - peers[id].lastSeen > PEER_TIMEOUT_MS) {
+          const p = peers[id];
+          if (p.slot >= 0) toast(p.name, 'lost connection');
+          delete peers[id];
+          changed = true;
+        }
+      }
+      if (changed) { refreshLobby(); refreshSquad(); }
+    }, 2500);
+
     // relay status + room-full check
     let fullChecked = false;
     setInterval(() => {
       const sockets = trystero.getRelaySockets ? trystero.getRelaySockets() : {};
       const live = Object.values(sockets).some(s => s && s.readyState === 1);
-      setRelayStatus(live, live ? 'Room live — share the link' : 'Linking relay network…');
+      const pilots = peerIds().filter(id => peers[id].slot >= 0).length + 1;
+      const label = pilots > 1 ? 'Room live · ' + pilots + ' pilots' : 'Room live — share the link';
+      setRelayStatus(live, live ? label : 'Linking relay network…');
       if (!fullChecked && peerIds().length + 1 > MAX_PLAYERS) {
         fullChecked = true;
         roomFull();
@@ -1116,7 +1200,7 @@
   }
 
   function myState() {
-    return { k: kills, h: player.hearts, d: player.deaths, a: player.alive };
+    return { n: myName, s: mySlot, k: kills, h: player.hearts, d: player.deaths, a: player.alive, p: running && !finished };
   }
   function pushState() { if (net) net.sendState(myState()); refreshSquad(); }
 
@@ -1154,6 +1238,7 @@
       e.driftAmp = d.A;
     }
     enemies.push(e);
+    lastSpawnAt = performance.now();
   }
 
   function spawnEnemy() {
@@ -1211,11 +1296,21 @@
     return [e.spawnX - e.speed * t, e.y0];
   }
   let spawnTickAt = performance.now();
+  let lastSpawnAt = 0;
+  const SPAWN_TAKEOVER_MS = 2500;
   setInterval(() => {
     const now = performance.now();
     const delta = now - spawnTickAt;
     spawnTickAt = now;
-    if (!running || paused || finished || !iAmSpawner()) return;
+    if (!running || paused || finished) return;
+    // Am I responsible for driving enemies right now? The primary is the
+    // lowest-id playing pilot. If it goes silent (backgrounded tab, a stall,
+    // or a drop trystero hasn't reported yet), the next pilot in line takes
+    // over after a short grace period — so waves never dry up mid-game.
+    const order = playingSpawnerIds();
+    const myIndex = order.indexOf(selfId());
+    const iDrive = myIndex === 0 || (now - lastSpawnAt) > myIndex * SPAWN_TAKEOVER_MS;
+    if (!iDrive) return;
     spawnTimer -= delta;
     if (spawnTimer <= 0) {
       spawnEnemy();
@@ -1550,14 +1645,12 @@
     hs.forEach((h, i) => h.classList.toggle('lost', i >= player.hearts));
   }
 
-  // squad leaderboard
-  const squadPanel = document.getElementById('squad-panel');
-  const squadList = document.getElementById('squad-list');
+  // standings — rendered into the pause popup (the live HUD leaderboard was
+  // replaced by the Pause / Share icons, so standings surface on pause)
+  const squadList = document.getElementById('pause-standings');
   let squadDirty = true;
   function refreshSquad() { squadDirty = true; }
-  setInterval(() => {
-    if (!squadDirty) return;
-    squadDirty = false;
+  function renderStandings() {
     const ids = peerIds().filter(id => peers[id].slot >= 0);
     const rows = [{ name: myName, slot: mySlot, kills, hearts: player.hearts, alive: player.alive, me: true }];
     for (const id of ids) {
@@ -1591,7 +1684,8 @@
       row.append(dot, name, hearts, k);
       squadList.appendChild(row);
     }
-  }, 300);
+  }
+  setInterval(() => { if (squadDirty && paused) { squadDirty = false; renderStandings(); } }, 300);
   setInterval(refreshSquad, 1500);
 
   // toasts
@@ -1992,12 +2086,65 @@
     paused = false;
     finished = false;
     elapsed = 0;
+    spawnTimer = 800;
+    lastSpawnAt = performance.now();
     player.labelT = 2.5;
     startOverlay.classList.add('hidden');
     ensureAudio();
     updateHearts();
     pushState();
   }
+
+  // ------------------------------------------------------------ pause / share
+  function openPause() {
+    if (!running || finished || paused) return;
+    paused = true;
+    squadDirty = true;
+    renderStandings();
+    document.getElementById('pause-mute').textContent = soundOn ? 'Mute sound' : 'Unmute sound';
+    pauseOverlay.classList.remove('hidden');
+  }
+  function closePause() {
+    if (!paused) return;
+    paused = false;
+    pauseOverlay.classList.add('hidden');
+    lastTime = 0;
+  }
+
+  async function copyInvite(tipEl) {
+    const url = location.href;
+    let ok = false;
+    try { await navigator.clipboard.writeText(url); ok = true; } catch (e) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = url; document.body.appendChild(ta); ta.select();
+        ok = document.execCommand('copy'); ta.remove();
+      } catch (e2) {}
+    }
+    if (tipEl) {
+      tipEl.textContent = ok ? 'Link copied' : 'Copy failed';
+      tipEl.classList.add('show');
+      clearTimeout(tipEl._t);
+      tipEl._t = setTimeout(() => tipEl.classList.remove('show'), 1600);
+    }
+  }
+
+  document.getElementById('pause-btn').addEventListener('click', openPause);
+  document.getElementById('share-btn').addEventListener('click', () => {
+    ensureAudio();
+    copyInvite(document.getElementById('share-tip'));
+  });
+  document.getElementById('pause-share').addEventListener('click', () => copyInvite(document.getElementById('pause-share-tip')));
+  document.getElementById('pause-mute').addEventListener('click', (e) => {
+    soundOn = !soundOn;
+    if (soundOn) ensureAudio();
+    e.currentTarget.textContent = soundOn ? 'Mute sound' : 'Unmute sound';
+  });
+  // tap the backdrop (not a button) to resume — matters on touch devices
+  pauseOverlay.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return;
+    closePause();
+  });
 
   // ------------------------------------------------------------ pilot preview
   const previewCanvas = document.getElementById('preview-canvas');
@@ -2086,13 +2233,9 @@
     }
     if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
     if (!running) { startGame(); return; }
-    if (paused) { paused = false; pauseOverlay.classList.add('hidden'); lastTime = 0; return; }
+    if (paused) { closePause(); return; }
     if (finished) return;
-    if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
-      paused = true;
-      pauseOverlay.classList.remove('hidden');
-      return;
-    }
+    if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') { openPause(); return; }
     keys[e.key.length === 1 ? e.key.toLowerCase() : e.key] = true;
   });
   window.addEventListener('keyup', (e) => {
@@ -2106,7 +2249,7 @@
   canvas.addEventListener('pointerdown', (e) => {
     ensureAudio();
     if (!running) { startGame(); return; }
-    if (paused) { paused = false; pauseOverlay.classList.add('hidden'); lastTime = 0; return; }
+    if (paused) { closePause(); return; }
     if (finished || !player.alive) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (e.clientX < W * 0.45) {
