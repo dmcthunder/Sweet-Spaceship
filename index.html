@@ -325,6 +325,58 @@
     50%      { opacity: 0.35; }
   }
 
+  /* mode select */
+  #mode-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .mode-btn {
+    flex: 1;
+    min-width: 170px;
+    max-width: 200px;
+    padding: 18px 16px;
+    border-radius: 16px;
+    border: 1px solid var(--line-soft);
+    background: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    transition: all 0.25s ease;
+  }
+  .mode-btn:hover {
+    border-color: var(--pink-soft);
+    background: var(--pink-fade);
+    transform: translateY(-2px);
+  }
+  .mode-name {
+    display: block;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .mode-desc {
+    display: block;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+  }
+  #mode-chip {
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--line-soft);
+    background: rgba(255, 255, 255, 0.55);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    display: flex;
+    align-items: center;
+  }
+
   /* pilot preview + color picker */
   #preview-wrap {
     position: relative;
@@ -602,8 +654,27 @@
 
 <button id="sound-btn" title="Toggle sound">&#9704;</button>
 
-<!-- Pilot customization overlay (shown first) -->
-<div class="overlay" id="name-overlay">
+<!-- Mode select overlay (room creators only) -->
+<div class="overlay hidden" id="mode-overlay">
+  <div class="overlay-card glass">
+    <div class="overlay-kicker">Advanced New Media</div>
+    <div class="overlay-title">Sweet Spaceship</div>
+    <div class="overlay-sub">Pick your mission — your friends join whichever you choose.</div>
+    <div id="mode-row">
+      <button class="mode-btn" id="mode-classic">
+        <span class="mode-name">Trench Run</span>
+        <span class="mode-desc">The classic run. Enemy ships sweep in from the right — hold the line.</span>
+      </button>
+      <button class="mode-btn" id="mode-zero">
+        <span class="mode-name">Zero G</span>
+        <span class="mode-desc">Rotate &amp; thrust, drift on momentum. No walls, and enemies come from everywhere.</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Pilot customization overlay -->
+<div class="overlay hidden" id="name-overlay">
   <div class="overlay-card glass">
     <div class="overlay-kicker">Advanced New Media</div>
     <div class="overlay-title">Name your pilot</div>
@@ -632,10 +703,11 @@
     <div class="overlay-kicker">Advanced New Media</div>
     <div class="overlay-title">Sweet Spaceship</div>
     <div class="overlay-sub" id="lobby-sub">
-      Clear the sector — and bring up to four friends.
+      Clear the sector — and bring up to three friends.
       Most ships destroyed tops the leaderboard.
     </div>
     <div id="room-row">
+      <div id="mode-chip">Trench Run</div>
       <div id="room-code">·····</div>
       <button id="copy-btn">Copy invite link</button>
     </div>
@@ -659,7 +731,7 @@
   <div class="overlay-card glass">
     <div class="overlay-kicker">Hangar's packed</div>
     <div class="overlay-title">This room is full</div>
-    <div class="overlay-sub">Five pilots are already flying in this room.</div>
+    <div class="overlay-sub">Four pilots are already flying in this room.</div>
     <div class="btn-row">
       <button class="btn btn-primary" id="new-room-btn">Start my own room</button>
     </div>
@@ -681,7 +753,7 @@
   'use strict';
 
   // ------------------------------------------------------------ constants
-  const MAX_PLAYERS = 5; // you + 4 friends
+  const MAX_PLAYERS = 4; // you + 3 friends
   const RESPAWN_SECONDS = 5;
 
   // slot 0 (#FF76A2) belongs to the room's original pilot; joiners pick the rest
@@ -689,7 +761,6 @@
     { main: '#FF76A2', soft: '#FFA8C4', deep: '#E85C8C', fade: '#FFD9E6' },
     { main: '#00C3FF', soft: '#66DAFF', deep: '#009FD6', fade: '#CCF3FF' },
     { main: '#3ED29C', soft: '#7FE3BE', deep: '#2BAA7D', fade: '#D8F7EB' },
-    { main: '#FF4546', soft: '#FF8A8B', deep: '#D93335', fade: '#FFD9D9' },
     { main: '#A58BEA', soft: '#C3B1F2', deep: '#8A6CD9', fade: '#EBE4FB' }
   ];
   const GRAY = '#C2C2C9';
@@ -776,7 +847,7 @@
   let elapsed = 0;
 
   const player = {
-    x: 0, y: 0, vx: 0, vy: 0, r: 16,
+    x: 0, y: 0, vx: 0, vy: 0, ang: 0, r: 16,
     cooldown: 0, invuln: 0,
     hearts: 3, deaths: 0, alive: true,
     respawnAt: 0, labelT: 0,
@@ -801,8 +872,9 @@
   }
 
   function resetLocal() {
-    player.x = W * 0.18;
+    player.x = mode === 'zero' ? W / 2 : W * 0.18;
     player.y = H * 0.5;
+    player.ang = mode === 'zero' ? -Math.PI / 2 : 0;
     player.vx = player.vy = 0;
     player.cooldown = 0;
     player.invuln = 0;
@@ -832,10 +904,16 @@
   let roomId = parseRoomId();
   // whoever creates the room is the Original pilot — they keep #FF76A2 (slot 0)
   const isOriginal = !roomId;
-  if (!roomId) {
-    roomId = makeRoomId();
-    try { history.replaceState(null, '', '#r=' + roomId); } catch (e) { location.hash = 'r=' + roomId; }
+  if (!roomId) roomId = makeRoomId();
+
+  // game mode travels in the invite link so the whole room plays the same one:
+  // 'classic' = Trench Run, 'zero' = Zero G (rotate & thrust, wrap-around)
+  let mode = /(^|[#&])m=z/.test(location.hash) ? 'zero' : 'classic';
+  function writeHash() {
+    const h = '#r=' + roomId + (mode === 'zero' ? '&m=z' : '');
+    try { history.replaceState(null, '', h); } catch (e) { location.hash = h.slice(1); }
   }
+  writeHash();
 
   let myName = (localStorage.getItem('hp-callsign') ||
     CALLSIGNS[Math.floor(Math.random() * CALLSIGNS.length)] + '-' + (1 + Math.floor(Math.random() * 89))).slice(0, 12);
@@ -849,7 +927,8 @@
     if (!peers[id]) {
       peers[id] = {
         name: '· · ·', slot: -1, kills: 0, hearts: 3, deaths: 0, alive: true,
-        x: -100, y: -100, tx: -100, ty: -100, hasPos: false, shots: [], labelT: 0
+        x: -100, y: -100, tx: -100, ty: -100, ang: 0, tAng: 0,
+        hasPos: false, shots: [], labelT: 0
       };
     }
     return peers[id];
@@ -914,7 +993,10 @@
       sendState(myState(), id);
       if (iAmSpawner()) {
         for (const e of enemies) {
-          sendSpawn({ i: e.id, y: e.y0 / H, x: e.x / W, v: e.speed, A: e.driftAmp, P: e.driftPhase, b: e.big ? 1 : 0, h: e.hp }, id);
+          const d = { i: e.id, x: e.x / W, y: e.y / H, v: e.speed, b: e.big ? 1 : 0, h: e.hp, m: e.maxHp };
+          if (e.vx !== undefined) { d.dx = e.vx / e.speed; d.dy = e.vy / e.speed; }
+          else { d.A = e.driftAmp; d.P = e.driftPhase; }
+          sendSpawn(d, id);
         }
       }
       refreshLobby();
@@ -962,12 +1044,13 @@
       const p = ensurePeer(id);
       p.tx = d[0] * W;
       p.ty = d[1] * H;
-      if (!p.hasPos) { p.x = p.tx; p.y = p.ty; p.hasPos = true; p.labelT = 2.5; }
+      p.tAng = d[2] || 0;
+      if (!p.hasPos) { p.x = p.tx; p.y = p.ty; p.ang = p.tAng; p.hasPos = true; p.labelT = 2.5; }
     });
 
     getFire((d, id) => {
       const p = ensurePeer(id);
-      p.shots.push({ x: d[0] * W, y: d[1] * H, age: 0 });
+      p.shots.push({ x: d[0] * W, y: d[1] * H, ang: d[2] || 0, age: 0 });
       if (p.shots.length > 6) p.shots.shift();
     });
 
@@ -1008,7 +1091,7 @@
     setInterval(() => {
       if (!net) return;
       if (running && !finished && player.alive) {
-        sendPos([player.x / W, player.y / H]);
+        sendPos([player.x / W, player.y / H, mode === 'zero' ? +player.ang.toFixed(2) : 0]);
       }
     }, 90);
     setInterval(() => { if (net) sendState(myState()); }, 2000);
@@ -1040,6 +1123,7 @@
   function roomFull() {
     try { room.leave(); } catch (e) {}
     net = null;
+    document.getElementById('mode-overlay').classList.add('hidden');
     document.getElementById('name-overlay').classList.add('hidden');
     document.getElementById('start-overlay').classList.add('hidden');
     document.getElementById('full-overlay').classList.remove('hidden');
@@ -1052,29 +1136,51 @@
   // ------------------------------------------------------------ enemies
   function applySpawn(d) {
     const x = (d.x !== undefined ? d.x : 1.05) * W;
-    enemies.push({
+    const y = d.y * H;
+    const e = {
       id: d.i,
-      x, spawnX: x, born: performance.now(),
-      y: d.y * H, y0: d.y * H,
+      x, y, y0: y,
+      spawnX: x, spawnY: y, born: performance.now(), age: 0,
       s: d.b ? 30 : 20,
       speed: d.v,
-      driftPhase: d.P, driftAmp: d.A,
-      hp: d.h, big: !!d.b,
+      hp: d.h, maxHp: d.m || d.h, big: !!d.b,
       flash: 0
-    });
+    };
+    if (d.dx !== undefined) {            // Zero G: velocity vector
+      e.vx = d.dx * d.v;
+      e.vy = d.dy * d.v;
+    } else {                             // Trench Run: sine drift
+      e.driftPhase = d.P;
+      e.driftAmp = d.A;
+    }
+    enemies.push(e);
   }
 
   function spawnEnemy() {
     const big = Math.random() < 0.18;
     const d = {
       i: selfId().slice(0, 4) + (enemyIdCounter++),
-      y: (90 + Math.random() * (H - 180)) / H,
       v: (big ? 55 : 80) + Math.random() * 50 + Math.min(elapsed / 1000, 60),
-      A: 20 + Math.random() * 40,
-      P: Math.random() * Math.PI * 2,
       b: big ? 1 : 0,
-      h: big ? 2 : 1
+      h: big ? 3 : 1,                    // big ships take three hits
+      m: big ? 3 : 1
     };
+    if (mode === 'zero') {
+      // spawn just outside a random edge, aimed at the middle of the arena
+      const edge = Math.floor(Math.random() * 4);
+      const t = Math.random();
+      d.x = edge === 0 ? -0.05 : edge === 1 ? 1.05 : t;
+      d.y = edge === 2 ? -0.05 : edge === 3 ? 1.05 : t;
+      const ax = (0.25 + Math.random() * 0.5) - d.x;
+      const ay = (0.25 + Math.random() * 0.5) - d.y;
+      const al = Math.hypot(ax, ay) || 1;
+      d.dx = ax / al;
+      d.dy = ay / al;
+    } else {
+      d.y = (90 + Math.random() * (H - 180)) / H;
+      d.A = 20 + Math.random() * 40;
+      d.P = Math.random() * Math.PI * 2;
+    }
     applySpawn(d);
     if (net) net.sendSpawn(d);
   }
@@ -1099,8 +1205,10 @@
   // freeze requestAnimationFrame in background tabs — the squadron's supply of
   // enemy ships must not depend on whose tab is focused. Uses time-predicted
   // enemy positions for the same reason.
-  function predictedX(e) {
-    return e.spawnX - e.speed * (performance.now() - e.born) / 1000;
+  function predictedPos(e) {
+    const t = (performance.now() - e.born) / 1000;
+    if (e.vx !== undefined) return [e.spawnX + e.vx * t, e.spawnY + e.vy * t];
+    return [e.spawnX - e.speed * t, e.y0];
   }
   let spawnTickAt = performance.now();
   setInterval(() => {
@@ -1117,8 +1225,8 @@
     for (const e of enemies) {
       if (e.fireTimer === undefined) e.fireTimer = 2000 + Math.random() * 4000;
       e.fireTimer -= delta;
-      const px = predictedX(e);
-      if (e.fireTimer <= 0 && px < W - 120 && px > 150) {
+      const [px, py] = predictedPos(e);
+      if (e.fireTimer <= 0 && px > 100 && px < W - 100 && py > 80 && py < H - 80) {
         e.fireTimer = 2600 + Math.random() * 3800;
         enemyFire(e);
       }
@@ -1169,8 +1277,9 @@
         player.labelT = 2.5;
         player.heat = 0;
         player.overheated = false;
-        player.x = W * 0.18;
+        player.x = mode === 'zero' ? W / 2 : W * 0.18;
         player.y = H * 0.5;
+        player.ang = mode === 'zero' ? -Math.PI / 2 : 0;
         player.vx = player.vy = 0;
         document.getElementById('respawn-chip').classList.remove('visible');
         pushState();
@@ -1180,34 +1289,77 @@
 
     // --- player movement (keyboard + stick)
     if (player.alive) {
-      const ACC = 2600, MAXV = 460;
-      let ax = 0, ay = 0;
-      if (keys['ArrowLeft'] || keys['a']) ax -= 1;
-      if (keys['ArrowRight'] || keys['d']) ax += 1;
-      if (keys['ArrowUp'] || keys['w']) ay -= 1;
-      if (keys['ArrowDown'] || keys['s']) ay += 1;
-      if (ax && ay) { ax *= 0.7071; ay *= 0.7071; }
-      if (stick.active) {
-        const mag = Math.min(1, Math.hypot(stick.dx, stick.dy) / 56);
-        if (mag > 0.12) {
-          const d = Math.hypot(stick.dx, stick.dy) || 1;
-          ax = stick.dx / d * mag;
-          ay = stick.dy / d * mag;
+      const MAXV = 460;
+      if (mode === 'zero') {
+        // Zero G: left/right rotate, up thrusts, down reverse-thrusts.
+        // Momentum carries when you let go, bleeding off slowly.
+        const ROT = 3.6, THRUST = 720, REVERSE = 430;
+        if (keys['ArrowLeft'] || keys['a']) player.ang -= ROT * dt;
+        if (keys['ArrowRight'] || keys['d']) player.ang += ROT * dt;
+        let thrust = 0;
+        if (keys['ArrowUp'] || keys['w']) thrust = THRUST;
+        else if (keys['ArrowDown'] || keys['s']) thrust = -REVERSE;
+        if (stick.active) {
+          const mag = Math.min(1, Math.hypot(stick.dx, stick.dy) / 56);
+          if (mag > 0.12) {
+            const target = Math.atan2(stick.dy, stick.dx);
+            let diff = target - player.ang;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            const step = ROT * dt;
+            player.ang += Math.abs(diff) < step ? diff : Math.sign(diff) * step;
+            thrust = THRUST * mag;
+          }
         }
+        player.vx += Math.cos(player.ang) * thrust * dt;
+        player.vy += Math.sin(player.ang) * thrust * dt;
+        const damp = Math.pow(0.6, dt);
+        player.vx *= damp;
+        player.vy *= damp;
+        const v = Math.hypot(player.vx, player.vy);
+        if (v > MAXV) { player.vx = player.vx / v * MAXV; player.vy = player.vy / v * MAXV; }
+        player.x += player.vx * dt;
+        player.y += player.vy * dt;
+        // cross an edge, reappear on the opposite side
+        if (player.x < 0) player.x += W;
+        if (player.x > W) player.x -= W;
+        if (player.y < 0) player.y += H;
+        if (player.y > H) player.y -= H;
+      } else {
+        const ACC = 2600;
+        let ax = 0, ay = 0;
+        if (keys['ArrowLeft'] || keys['a']) ax -= 1;
+        if (keys['ArrowRight'] || keys['d']) ax += 1;
+        if (keys['ArrowUp'] || keys['w']) ay -= 1;
+        if (keys['ArrowDown'] || keys['s']) ay += 1;
+        if (ax && ay) { ax *= 0.7071; ay *= 0.7071; }
+        if (stick.active) {
+          const mag = Math.min(1, Math.hypot(stick.dx, stick.dy) / 56);
+          if (mag > 0.12) {
+            const d = Math.hypot(stick.dx, stick.dy) || 1;
+            ax = stick.dx / d * mag;
+            ay = stick.dy / d * mag;
+          }
+        }
+        player.vx += ax * ACC * dt;
+        player.vy += ay * ACC * dt;
+        const damp = Math.pow(0.0025, dt);
+        player.vx *= damp;
+        player.vy *= damp;
+        const v = Math.hypot(player.vx, player.vy);
+        if (v > MAXV) { player.vx = player.vx / v * MAXV; player.vy = player.vy / v * MAXV; }
+        player.x += player.vx * dt;
+        player.y += player.vy * dt;
+        player.x = Math.max(30, Math.min(W - 30, player.x));
+        player.y = Math.max(70, Math.min(H - 40, player.y));
       }
-      player.vx += ax * ACC * dt;
-      player.vy += ay * ACC * dt;
-      const damp = Math.pow(0.0025, dt);
-      player.vx *= damp;
-      player.vy *= damp;
-      const v = Math.hypot(player.vx, player.vy);
-      if (v > MAXV) { player.vx = player.vx / v * MAXV; player.vy = player.vy / v * MAXV; }
-      player.x += player.vx * dt;
-      player.y += player.vy * dt;
-      player.x = Math.max(30, Math.min(W - 30, player.x));
-      player.y = Math.max(70, Math.min(H - 40, player.y));
 
-      player.trail.unshift({ x: player.x - 22, y: player.y, life: 1 });
+      const heading = mode === 'zero' ? player.ang : 0;
+      player.trail.unshift({
+        x: player.x - Math.cos(heading) * 22,
+        y: player.y - Math.sin(heading) * 22,
+        life: 1
+      });
       if (player.trail.length > 14) player.trail.pop();
 
       if (player.invuln > 0) player.invuln -= dt;
@@ -1222,14 +1374,24 @@
         shots += 2;
         player.heat += 0.07;
         if (player.heat >= 1) { player.heat = 1; player.overheated = true; }
-        bullets.push({ x: player.x + 16, y: player.y - 11, vx: 780 });
-        bullets.push({ x: player.x + 16, y: player.y + 11, vx: 780 });
+        const ux = Math.cos(heading), uy = Math.sin(heading);
+        for (const side of [-1, 1]) {
+          bullets.push({
+            x: player.x + ux * 16 - uy * 11 * side,
+            y: player.y + uy * 16 + ux * 11 * side,
+            vx: ux * 780, vy: uy * 780
+          });
+        }
         sfx.laser();
-        if (net && Math.random() < 0.5) net.sendFire([player.x / W, player.y / H]);
+        if (net && Math.random() < 0.5) net.sendFire([player.x / W, player.y / H, +heading.toFixed(2)]);
       }
     }
     for (const t of player.trail) t.life -= dt * 3.4;
-    bullets = bullets.filter(b => { b.x += b.vx * dt; return b.x < W + 40; });
+    bullets = bullets.filter(b => {
+      b.x += b.vx * dt;
+      b.y += (b.vy || 0) * dt;
+      return b.x > -40 && b.x < W + 40 && b.y > -40 && b.y < H + 40;
+    });
 
     // --- stars
     for (const st of stars) {
@@ -1240,12 +1402,21 @@
     // --- enemies (spawning + fire decisions live on a setInterval so the
     //     world keeps producing ships even if the spawner's tab is throttled)
     for (const e of enemies) {
-      e.x -= e.speed * dt;
-      e.driftPhase += dt * 1.4;
-      e.y += Math.sin(e.driftPhase) * e.driftAmp * dt;
+      e.age += dt;
+      if (e.vx !== undefined) {          // Zero G: straight line from any edge
+        e.x += e.vx * dt;
+        e.y += e.vy * dt;
+      } else {                           // Trench Run: sweep in from the right
+        e.x -= e.speed * dt;
+        e.driftPhase += dt * 1.4;
+        e.y += Math.sin(e.driftPhase) * e.driftAmp * dt;
+      }
       if (e.flash > 0) e.flash -= dt;
     }
-    enemies = enemies.filter(e => e.x > -80);
+    enemies = enemies.filter(e =>
+      e.vx !== undefined
+        ? !(e.age > 3 && (e.x < -150 || e.x > W + 150 || e.y < -150 || e.y > H + 150))
+        : e.x > -80);
 
     if (player.labelT > 0) player.labelT -= dt;
 
@@ -1314,6 +1485,10 @@
         const k = Math.min(1, dt * 10);
         p.x += (p.tx - p.x) * k;
         p.y += (p.ty - p.y) * k;
+        let da = p.tAng - p.ang;
+        while (da > Math.PI) da -= Math.PI * 2;
+        while (da < -Math.PI) da += Math.PI * 2;
+        p.ang += da * k;
       }
       if (p.labelT > 0) p.labelT -= dt;
       for (const s of p.shots) s.age += dt;
@@ -1506,6 +1681,16 @@
     ctx.restore();
   }
 
+  // life bar for the big ships — three hits, a third gone per hit
+  function drawHpBar(e) {
+    const w = e.s * 2.2, h = 3;
+    const x = e.x - w / 2, y = e.y - e.s * 1.6 - 8;
+    ctx.fillStyle = 'rgba(150, 150, 160, 0.22)';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#A9A9B2';
+    ctx.fillRect(x, y, w * (e.hp / e.maxHp), h);
+  }
+
   function drawTargetBrackets(e) {
     const pad = e.s * 1.7;
     const arm = e.s * 0.55;
@@ -1602,11 +1787,12 @@
       ctx.globalAlpha = t.life * 0.35;
       ctx.fillStyle = i % 2 ? c.soft : c.fade;
       ctx.beginPath();
-      ctx.arc(t.x - i * 2.4, t.y, Math.max(0.5, 4.2 - i * 0.3), 0, Math.PI * 2);
+      ctx.arc(t.x - (mode === 'zero' ? 0 : i * 2.4), t.y, Math.max(0.5, 4.2 - i * 0.3), 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
-    drawShip(ctx, player.x, player.y, c, player.vy * 0.00035, 1);
+    drawShip(ctx, player.x, player.y, c,
+      mode === 'zero' ? player.ang : player.vy * 0.00035, 1);
     if (player.labelT > 0) {
       drawNamePill(ctx, player.x, player.y - 34, myName, c.main, Math.min(1, player.labelT * 2));
     }
@@ -1620,22 +1806,25 @@
       if (!p.hasPos || p.slot < 0) continue;
       const cols = SLOT_COLORS[p.slot];
       if (p.alive) {
-        drawShip(ctx, p.x, p.y, cols, 0, 0.55);
+        drawShip(ctx, p.x, p.y, cols, p.ang || 0, 0.55);
         if (p.labelT > 0) {
           drawNamePill(ctx, p.x, p.y - 34, p.name, cols.main, Math.min(1, p.labelT * 2) * 0.9);
         }
       }
-      // cosmetic laser flashes
+      // cosmetic laser flashes, fired along the ghost's heading
       for (const s of p.shots) {
         const prog = s.age / 0.45;
-        const bx = s.x + 16 + prog * 350;
+        const ux = Math.cos(s.ang || 0), uy = Math.sin(s.ang || 0);
+        const dist = 16 + prog * 350;
         ctx.globalAlpha = 1 - prog;
         ctx.strokeStyle = cols.main;
         ctx.lineWidth = 2;
         for (const side of [-1, 1]) {
+          const bx = s.x + ux * dist - uy * 11 * side;
+          const by = s.y + uy * dist + ux * 11 * side;
           ctx.beginPath();
-          ctx.moveTo(bx - 14, s.y + side * 11);
-          ctx.lineTo(bx, s.y + side * 11);
+          ctx.moveTo(bx - ux * 14, by - uy * 14);
+          ctx.lineTo(bx, by);
           ctx.stroke();
         }
         ctx.globalAlpha = 1;
@@ -1673,14 +1862,18 @@
     for (const st of stars) ctx.fillRect(st.x, st.y, st.s, st.s);
 
     if (enemies.length && player.alive) {
-      let nearest = enemies[0];
+      let nearest = enemies[0], best = Infinity;
       for (const e of enemies) {
-        if (Math.abs(e.x - player.x) < Math.abs(nearest.x - player.x)) nearest = e;
+        const d2 = (e.x - player.x) ** 2 + (e.y - player.y) ** 2;
+        if (d2 < best) { best = d2; nearest = e; }
       }
       drawTargetBrackets(nearest);
     }
 
-    for (const e of enemies) drawTIE(e);
+    for (const e of enemies) {
+      drawTIE(e);
+      if (e.maxHp > 1) drawHpBar(e);
+    }
 
     ctx.strokeStyle = '#B4B4BC';
     ctx.lineWidth = 2;
@@ -1697,12 +1890,14 @@
 
     const c = myColors();
     for (const b of bullets) {
+      const bd = Math.hypot(b.vx, b.vy || 0) || 1;
+      const ux = b.vx / bd, uy = (b.vy || 0) / bd;
       ctx.strokeStyle = c.fade;
       ctx.lineWidth = 5;
-      ctx.beginPath(); ctx.moveTo(b.x - 16, b.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(b.x - ux * 16, b.y - uy * 16); ctx.lineTo(b.x, b.y); ctx.stroke();
       ctx.strokeStyle = c.main;
       ctx.lineWidth = 2.2;
-      ctx.beginPath(); ctx.moveTo(b.x - 16, b.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(b.x - ux * 16, b.y - uy * 16); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
 
     for (const p of particles) {
@@ -1746,11 +1941,40 @@
   requestAnimationFrame(frame);
 
   // ------------------------------------------------------------ flow
+  const modeOverlay = document.getElementById('mode-overlay');
   const nameOverlay = document.getElementById('name-overlay');
   const startOverlay = document.getElementById('start-overlay');
   const pauseOverlay = document.getElementById('pause-overlay');
 
-  let stage = 'name'; // name → lobby → flying
+  // creators pick the mission first; joiners inherit it from the invite link
+  let stage = isOriginal ? 'mode' : 'name'; // mode → name → lobby → flying
+
+  function applyModeUI() {
+    document.getElementById('mode-chip').textContent = mode === 'zero' ? 'Zero G' : 'Trench Run';
+    document.getElementById('controls-panel').innerHTML = mode === 'zero'
+      ? '<span><span class="key">&#9664;</span><span class="key">&#9654;</span>&nbsp; rotate</span>' +
+        '<span><span class="key">&#9650;</span>&nbsp; thrust &nbsp;<span class="key">&#9660;</span>&nbsp; reverse</span>' +
+        '<span><span class="key" style="min-width:52px">SPACE</span>&nbsp; to fire</span>'
+      : '<span><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span>&nbsp; or arrows to fly</span>' +
+        '<span><span class="key" style="min-width:52px">SPACE</span>&nbsp; to fire</span>';
+    if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+      document.getElementById('launch-hint').textContent = mode === 'zero'
+        ? 'Tap to launch — drag left to steer & thrust, tap right to fire'
+        : 'Tap to launch — drag left to fly, tap right to fire';
+    }
+  }
+
+  function chooseMode(m) {
+    if (stage !== 'mode') return;
+    mode = m;
+    writeHash();
+    applyModeUI();
+    stage = 'name';
+    modeOverlay.classList.add('hidden');
+    nameOverlay.classList.remove('hidden');
+  }
+  document.getElementById('mode-classic').addEventListener('click', () => { ensureAudio(); chooseMode('classic'); });
+  document.getElementById('mode-zero').addEventListener('click', () => { ensureAudio(); chooseMode('zero'); });
 
   function toHangar() {
     if (stage !== 'name') return;
@@ -1761,7 +1985,7 @@
   }
 
   function startGame() {
-    if (running || stage === 'name') return;
+    if (running || stage !== 'lobby') return;
     stage = 'flying';
     resetLocal();
     running = true;
@@ -1855,6 +2079,7 @@
       if (e.key === 'Enter') toHangar();
       return;
     }
+    if (stage === 'mode') return;
     if (stage === 'name') {
       if (e.key === 'Enter') toHangar();
       return;
@@ -1961,9 +2186,8 @@
 
   // ------------------------------------------------------------ init
   document.getElementById('room-code').textContent = roomId;
-  if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
-    document.getElementById('launch-hint').textContent = 'Tap to launch — drag left to fly, tap right to fire';
-  }
+  applyModeUI();
+  (stage === 'mode' ? modeOverlay : nameOverlay).classList.remove('hidden');
   refreshLobby();
   setupNet();
 })();
