@@ -1,0 +1,1972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Sweet Spaceship</title>
+<style>
+  :root {
+    --pink: #FF76A2;
+    --pink-soft: #FFA8C4;
+    --pink-fade: #FFD9E6;
+    --pink-deep: #E85C8C;
+    --ink: #3A3A40;
+    --ink-soft: #8A8A92;
+    --line: #C9C9CE;
+    --line-soft: #E4E4E9;
+    --glass: rgba(255, 255, 255, 0.55);
+    --glass-border: rgba(255, 255, 255, 0.85);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { height: 100%; overflow: hidden; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 700px at 80% -10%, rgba(255, 118, 162, 0.07), transparent 60%),
+      radial-gradient(1000px 800px at -10% 110%, rgba(180, 180, 195, 0.14), transparent 55%),
+      linear-gradient(rgba(200, 200, 210, 0.13) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(200, 200, 210, 0.13) 1px, transparent 1px),
+      #FAFAFC;
+    background-size: auto, auto, 56px 56px, 56px 56px, auto;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: none;
+    overscroll-behavior: none;
+  }
+
+  #game {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+  }
+
+  /* ---------- glass chrome ---------- */
+
+  .glass {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+    backdrop-filter: blur(18px) saturate(1.3);
+    border: 1px solid var(--glass-border);
+    box-shadow:
+      0 1px 2px rgba(60, 60, 70, 0.05),
+      0 12px 32px rgba(60, 60, 70, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    border-radius: 18px;
+  }
+
+  .hud {
+    position: fixed;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .hud > * { pointer-events: auto; }
+
+  /* score + hearts — top left */
+  #score-panel {
+    top: 20px;
+    left: 20px;
+    padding: 12px 18px;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+  }
+  .stat-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 3px;
+  }
+  .stat-value {
+    font-size: 20px;
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+  }
+  #score-value { color: var(--pink-deep); }
+  #hearts {
+    display: flex;
+    gap: 4px;
+    font-size: 17px;
+    line-height: 1;
+  }
+  .heart { color: var(--pink); transition: color 0.25s ease, transform 0.25s ease; }
+  .heart.lost { color: #DDDDE3; transform: scale(0.82); }
+
+  /* leaderboard — top right */
+  #squad-panel {
+    top: 20px;
+    right: 20px;
+    padding: 12px 16px 10px;
+    min-width: 210px;
+  }
+  #heat-track {
+    width: 64px;
+    height: 4px;
+    margin-top: 9px;
+    border-radius: 4px;
+    background: rgba(150, 150, 160, 0.18);
+    overflow: hidden;
+  }
+  #heat-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 4px;
+    background: var(--pink);
+    transition: width 0.1s linear;
+  }
+  #heat-label.overheated { color: #D93335; animation: fade-pulse 0.8s ease-in-out infinite; }
+  #squad-title {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+  }
+  .squad-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 12px;
+  }
+  .squad-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex: none;
+  }
+  .squad-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 110px;
+    color: var(--ink);
+  }
+  .squad-name .you { color: var(--ink-soft); font-size: 10px; }
+  .squad-hearts { font-size: 10px; letter-spacing: 1px; }
+  .squad-kills {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--pink-deep);
+    min-width: 22px;
+    text-align: right;
+  }
+  .squad-row.down .squad-name { color: var(--ink-soft); font-style: italic; }
+
+  /* controls hint — bottom left (keyboard devices only) */
+  #controls-panel {
+    bottom: 20px;
+    left: 20px;
+    padding: 12px 18px;
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    font-size: 11px;
+    color: var(--ink-soft);
+    letter-spacing: 0.02em;
+  }
+  .key {
+    display: inline-block;
+    min-width: 22px;
+    padding: 3px 6px;
+    margin: 0 1px;
+    border-radius: 6px;
+    border: 1px solid var(--line-soft);
+    background: rgba(255, 255, 255, 0.7);
+    font-size: 10px;
+    font-weight: 600;
+    text-align: center;
+    color: var(--ink);
+    box-shadow: 0 1px 0 rgba(60, 60, 70, 0.08);
+  }
+  @media (pointer: coarse) {
+    #controls-panel { display: none; }
+  }
+
+  /* sound — bottom right */
+  #sound-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 10;
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    cursor: pointer;
+    font-size: 15px;
+    color: var(--ink-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* respawn chip — center */
+  #respawn-chip {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 14px 26px;
+    font-size: 13px;
+    color: var(--ink);
+    display: none;
+    text-align: center;
+  }
+  #respawn-chip.visible { display: block; }
+  #respawn-count { font-weight: 600; color: var(--pink-deep); }
+
+  /* toasts — bottom center */
+  #toasts {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    pointer-events: none;
+  }
+  .toast {
+    padding: 8px 18px;
+    font-size: 12px;
+    color: var(--ink);
+    border-radius: 12px;
+    animation: toast-in 0.3s ease both;
+    transition: opacity 0.4s ease;
+  }
+  .toast .accent { color: var(--pink-deep); font-weight: 600; }
+  @keyframes toast-in {
+    from { transform: translateY(8px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+
+  /* ---------- overlays ---------- */
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(250, 250, 252, 0.4);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    opacity: 1;
+    transition: opacity 0.4s ease;
+    overflow-y: auto;
+  }
+  .overlay.hidden { opacity: 0; pointer-events: none; }
+
+  .overlay-card {
+    text-align: center;
+    padding: 36px 44px;
+    max-width: 470px;
+    width: calc(100% - 40px);
+    margin: 20px;
+    animation: card-in 0.5s ease both;
+  }
+  @keyframes card-in {
+    from { transform: translateY(14px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+
+  .overlay-kicker {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--pink);
+    margin-bottom: 10px;
+  }
+  .overlay-title {
+    font-size: 27px;
+    font-weight: 200;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    margin-bottom: 10px;
+  }
+  .overlay-sub {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    margin-bottom: 20px;
+  }
+  .overlay-hint {
+    font-size: 11px;
+    color: var(--ink-soft);
+    letter-spacing: 0.02em;
+  }
+  .overlay-hint .pulse {
+    display: inline-block;
+    color: var(--pink-deep);
+    font-weight: 600;
+    animation: fade-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes fade-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+  }
+
+  /* pilot preview + color picker */
+  #preview-wrap {
+    position: relative;
+    width: 230px;
+    margin: 0 auto 18px;
+  }
+  #preview-canvas {
+    width: 220px;
+    height: 140px;
+    display: block;
+    margin: 0 auto;
+    cursor: crosshair;
+  }
+  .color-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--line-soft);
+    background: rgba(255, 255, 255, 0.75);
+    color: var(--pink-deep);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-bottom: 2px;
+  }
+  .color-arrow:hover {
+    border-color: var(--pink-soft);
+    background: var(--pink-fade);
+    transform: translateY(-50%) scale(1.08);
+  }
+  #color-prev { left: -10px; }
+  #color-next { right: -10px; }
+
+  /* lobby bits */
+  #room-row {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: stretch;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  #room-code {
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: 1px dashed var(--line);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.24em;
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.55);
+    display: flex;
+    align-items: center;
+  }
+  #copy-btn {
+    padding: 10px 18px;
+    border-radius: 12px;
+    border: 1px solid var(--pink-soft);
+    background: rgba(255, 255, 255, 0.6);
+    color: var(--pink-deep);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+  #copy-btn:hover { background: var(--pink-fade); }
+  #callsign-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  #callsign-row label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  #callsign-input {
+    width: 130px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--line-soft);
+    background: rgba(255, 255, 255, 0.7);
+    font-family: inherit;
+    font-size: 13px;
+    text-align: center;
+    color: var(--ink);
+    outline: none;
+  }
+  #callsign-input:focus { border-color: var(--pink-soft); }
+  #lobby-players {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    min-height: 26px;
+  }
+  .lobby-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line-soft);
+    background: rgba(255, 255, 255, 0.6);
+    font-size: 11px;
+    color: var(--ink);
+  }
+  #relay-status {
+    font-size: 10px;
+    color: var(--ink-soft);
+    letter-spacing: 0.04em;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  #relay-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #D3D3D9;
+    transition: background 0.3s ease;
+  }
+  #relay-dot.live { background: var(--pink); box-shadow: 0 0 6px rgba(255, 118, 162, 0.7); }
+
+  .final-stats {
+    display: flex;
+    justify-content: center;
+    gap: 34px;
+    margin-bottom: 22px;
+  }
+  .final-stat .stat-value { font-size: 24px; }
+
+  #final-standings {
+    margin: 0 auto 22px;
+    max-width: 280px;
+    text-align: left;
+    display: none;
+  }
+  #final-standings.visible { display: block; }
+
+  .btn-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+  .btn-primary {
+    background: var(--pink);
+    border: 1px solid var(--pink);
+    color: #fff;
+    box-shadow: 0 6px 20px rgba(255, 118, 162, 0.35);
+  }
+  .btn-primary:hover { background: var(--pink-deep); }
+  .btn-ghost {
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid var(--line-soft);
+    color: var(--ink);
+  }
+
+  .check-ring {
+    width: 66px;
+    height: 66px;
+    margin: 0 auto 18px;
+    border-radius: 50%;
+    border: 1.5px solid var(--pink-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--pink);
+    box-shadow: 0 0 0 10px rgba(255, 118, 162, 0.07);
+  }
+  .check-ring svg { width: 26px; height: 26px; }
+
+  /* rotate prompt — touch devices in portrait */
+  #rotate-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(250, 250, 252, 0.92);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+  @media (orientation: portrait) and (pointer: coarse) {
+    #rotate-overlay { display: flex; }
+  }
+  #rotate-overlay .overlay-title { font-size: 20px; }
+  #rotate-icon {
+    font-size: 34px;
+    margin-bottom: 14px;
+    display: inline-block;
+    animation: tilt 1.8s ease-in-out infinite;
+  }
+  @keyframes tilt {
+    0%, 55%, 100% { transform: rotate(0deg); }
+    25%, 40%      { transform: rotate(90deg); }
+  }
+
+  /* compact HUD on small screens */
+  @media (max-width: 760px), (max-height: 480px) {
+    #score-panel { top: 12px; left: 12px; padding: 8px 14px; gap: 16px; border-radius: 14px; }
+    .stat-value { font-size: 16px; }
+    #hearts { font-size: 14px; }
+    #squad-panel { top: 12px; right: 12px; padding: 10px 12px 8px; min-width: 160px; border-radius: 14px; }
+    #sound-btn { bottom: 12px; right: 12px; width: 38px; height: 38px; }
+    .overlay-card { padding: 26px 24px; }
+    .overlay-title { font-size: 22px; }
+    .overlay-sub { font-size: 12px; margin-bottom: 14px; }
+    .final-stats { gap: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<!-- HUD -->
+<div class="hud glass" id="score-panel">
+  <div>
+    <div class="stat-label">Score</div>
+    <div class="stat-value" id="score-value">000000</div>
+  </div>
+  <div>
+    <div class="stat-label">Destroyed</div>
+    <div class="stat-value" id="kills-value">0</div>
+  </div>
+  <div>
+    <div class="stat-label">Hearts</div>
+    <div id="hearts">
+      <span class="heart">&#9829;</span><span class="heart">&#9829;</span><span class="heart">&#9829;</span>
+    </div>
+  </div>
+  <div>
+    <div class="stat-label" id="heat-label">Weapon</div>
+    <div id="heat-track"><div id="heat-fill"></div></div>
+  </div>
+</div>
+
+<div class="hud glass" id="squad-panel">
+  <div id="squad-title">Leaderboard</div>
+  <div id="squad-list"></div>
+</div>
+
+<div class="hud glass" id="controls-panel">
+  <span><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span>&nbsp; or arrows to fly</span>
+  <span><span class="key" style="min-width:52px">SPACE</span>&nbsp; to fire</span>
+</div>
+
+<div class="hud glass" id="respawn-chip">
+  Ship destroyed — respawning in <span id="respawn-count">5</span>
+</div>
+
+<div id="toasts"></div>
+
+<button id="sound-btn" title="Toggle sound">&#9704;</button>
+
+<!-- Pilot customization overlay (shown first) -->
+<div class="overlay" id="name-overlay">
+  <div class="overlay-card glass">
+    <div class="overlay-kicker">Advanced New Media</div>
+    <div class="overlay-title">Name your pilot</div>
+    <div class="overlay-sub">
+      Your callsign shows above your ship for a moment when you launch.
+      Pick a color — no two pilots share one.
+    </div>
+    <div id="preview-wrap">
+      <canvas id="preview-canvas" width="440" height="280"></canvas>
+      <button class="color-arrow" id="color-prev" aria-label="Previous color">&#8249;</button>
+      <button class="color-arrow" id="color-next" aria-label="Next color">&#8250;</button>
+    </div>
+    <div id="callsign-row">
+      <label for="callsign-input">Callsign</label>
+      <input id="callsign-input" maxlength="12" autocomplete="off" spellcheck="false" />
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="hangar-btn">To the hangar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lobby overlay -->
+<div class="overlay hidden" id="start-overlay">
+  <div class="overlay-card glass">
+    <div class="overlay-kicker">Advanced New Media</div>
+    <div class="overlay-title">Sweet Spaceship</div>
+    <div class="overlay-sub" id="lobby-sub">
+      Clear the sector — and bring up to four friends.
+      Most ships destroyed tops the leaderboard.
+    </div>
+    <div id="room-row">
+      <div id="room-code">·····</div>
+      <button id="copy-btn">Copy invite link</button>
+    </div>
+    <div id="lobby-players"></div>
+    <div id="relay-status"><span id="relay-dot"></span><span id="relay-text">Linking relay network…</span></div>
+    <div class="overlay-hint"><span class="pulse" id="launch-hint">Press any key to launch</span></div>
+  </div>
+</div>
+
+<!-- Pause overlay -->
+<div class="overlay hidden" id="pause-overlay">
+  <div class="overlay-card glass">
+    <div class="overlay-kicker">Standby</div>
+    <div class="overlay-title">Paused</div>
+    <div class="overlay-hint"><span class="pulse">Press any key or tap to resume</span></div>
+  </div>
+</div>
+
+<!-- Room full overlay -->
+<div class="overlay hidden" id="full-overlay">
+  <div class="overlay-card glass">
+    <div class="overlay-kicker">Hangar's packed</div>
+    <div class="overlay-title">This room is full</div>
+    <div class="overlay-sub">Five pilots are already flying in this room.</div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="new-room-btn">Start my own room</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rotate prompt -->
+<div id="rotate-overlay">
+  <div class="overlay-card glass">
+    <span id="rotate-icon">&#9707;</span>
+    <div class="overlay-title">Rotate your device</div>
+    <div class="overlay-sub" style="margin-bottom:0">This cockpit flies in landscape.</div>
+  </div>
+</div>
+
+<script src="trystero-nostr.js"></script>
+<script>
+(() => {
+  'use strict';
+
+  // ------------------------------------------------------------ constants
+  const MAX_PLAYERS = 5; // you + 4 friends
+  const RESPAWN_SECONDS = 5;
+
+  // slot 0 (#FF76A2) belongs to the room's original pilot; joiners pick the rest
+  const SLOT_COLORS = [
+    { main: '#FF76A2', soft: '#FFA8C4', deep: '#E85C8C', fade: '#FFD9E6' },
+    { main: '#00C3FF', soft: '#66DAFF', deep: '#009FD6', fade: '#CCF3FF' },
+    { main: '#3ED29C', soft: '#7FE3BE', deep: '#2BAA7D', fade: '#D8F7EB' },
+    { main: '#FF4546', soft: '#FF8A8B', deep: '#D93335', fade: '#FFD9D9' },
+    { main: '#A58BEA', soft: '#C3B1F2', deep: '#8A6CD9', fade: '#EBE4FB' }
+  ];
+  const GRAY = '#C2C2C9';
+  const GRAY_SOFT = '#DCDCE2';
+
+  const CALLSIGNS = ['Rogue', 'Echo', 'Nova', 'Vector', 'Halo', 'Comet', 'Wren', 'Pixel'];
+
+  // ------------------------------------------------------------ canvas
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  let W = 0, H = 0, DPR = 1;
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', () => setTimeout(resize, 300));
+  resize();
+
+  // ------------------------------------------------------------ audio
+  let audioCtx = null;
+  let soundOn = true;
+
+  function ensureAudio() {
+    if (!audioCtx) {
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  function beep(type, freq, dur, vol, slide) {
+    if (!soundOn || !audioCtx) return;
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    if (slide) osc.frequency.exponentialRampToValueAtTime(slide, t + dur);
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + dur);
+  }
+  function noiseBurst(dur, vol) {
+    if (!soundOn || !audioCtx) return;
+    const t = audioCtx.currentTime;
+    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * dur, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 900;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(filter).connect(gain).connect(audioCtx.destination);
+    src.start(t);
+  }
+  const sfx = {
+    laser()     { beep('triangle', 880, 0.09, 0.045, 320); },
+    explosion() { noiseBurst(0.35, 0.16); beep('sine', 180, 0.25, 0.08, 60); },
+    hit()       { noiseBurst(0.2, 0.1); beep('sine', 120, 0.3, 0.1, 40); },
+    down()      { noiseBurst(0.55, 0.2); beep('sine', 200, 0.5, 0.1, 30); },
+    ready()     { beep('sine', 660, 0.12, 0.07); setTimeout(() => beep('sine', 990, 0.25, 0.07), 130); }
+  };
+
+  const soundBtn = document.getElementById('sound-btn');
+  soundBtn.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundBtn.innerHTML = soundOn ? '&#9704;' : '&#9705;';
+  });
+
+  // ------------------------------------------------------------ state
+  const keys = {};
+  let running = false, paused = false, finished = false;
+  let lastTime = 0;
+  let elapsed = 0;
+
+  const player = {
+    x: 0, y: 0, vx: 0, vy: 0, r: 16,
+    cooldown: 0, invuln: 0,
+    hearts: 3, deaths: 0, alive: true,
+    respawnAt: 0, labelT: 0,
+    heat: 0, overheated: false,
+    trail: []
+  };
+
+  let bullets = [], enemyBullets = [], enemies = [], particles = [], stars = [];
+  let score = 0, kills = 0, shots = 0, hitsLanded = 0;
+  let spawnTimer = 1000, enemyIdCounter = 0;
+  let shake = 0;
+
+  // touch controls
+  const stick = { active: false, id: -1, ox: 0, oy: 0, dx: 0, dy: 0 };
+  let firePointers = 0;
+
+  function initStars() {
+    stars = [];
+    for (let i = 0; i < 60; i++) {
+      stars.push({ x: Math.random() * W, y: Math.random() * H, s: 0.4 + Math.random() * 1.4, v: 12 + Math.random() * 30 });
+    }
+  }
+
+  function resetLocal() {
+    player.x = W * 0.18;
+    player.y = H * 0.5;
+    player.vx = player.vy = 0;
+    player.cooldown = 0;
+    player.invuln = 0;
+    player.hearts = 3;
+    player.alive = true;
+    player.heat = 0;
+    player.overheated = false;
+    player.trail = [];
+    bullets = [];
+    particles = [];
+    shake = 0;
+    initStars();
+  }
+
+  // ------------------------------------------------------------ networking
+  const ROOM_CHARS = 'ABCDEFGHJKMNPQRSTVWXYZ23456789';
+  function makeRoomId() {
+    let s = '';
+    for (let i = 0; i < 5; i++) s += ROOM_CHARS[Math.floor(Math.random() * ROOM_CHARS.length)];
+    return s;
+  }
+  function parseRoomId() {
+    const m = location.hash.match(/r=([A-Z2-9]{5})/i);
+    return m ? m[1].toUpperCase() : null;
+  }
+
+  let roomId = parseRoomId();
+  // whoever creates the room is the Original pilot — they keep #FF76A2 (slot 0)
+  const isOriginal = !roomId;
+  if (!roomId) {
+    roomId = makeRoomId();
+    try { history.replaceState(null, '', '#r=' + roomId); } catch (e) { location.hash = 'r=' + roomId; }
+  }
+
+  let myName = (localStorage.getItem('hp-callsign') ||
+    CALLSIGNS[Math.floor(Math.random() * CALLSIGNS.length)] + '-' + (1 + Math.floor(Math.random() * 89))).slice(0, 12);
+  let mySlot = 0; // provisional; joiners re-pick once the room is known
+
+  // peers[id] = {name, slot, kills, hearts, deaths, alive, x, y, tx, ty, seen, shots: [{x,y,age}]}
+  const peers = {};
+  let room = null, net = null, spawnerId = null;
+
+  function ensurePeer(id) {
+    if (!peers[id]) {
+      peers[id] = {
+        name: '· · ·', slot: -1, kills: 0, hearts: 3, deaths: 0, alive: true,
+        x: -100, y: -100, tx: -100, ty: -100, hasPos: false, shots: [], labelT: 0
+      };
+    }
+    return peers[id];
+  }
+  function peerIds() { return Object.keys(peers); }
+  function playerCount() { return peerIds().length + 1; }
+
+  // random color, no repeats; slot 0 is reserved for the Original pilot
+  function pickSlot() {
+    if (isOriginal) return 0;
+    const taken = peerIds().map(id => peers[id].slot);
+    const free = [];
+    for (let s = 1; s < SLOT_COLORS.length; s++) if (!taken.includes(s)) free.push(s);
+    if (!free.length) return 1 + Math.floor(Math.random() * (SLOT_COLORS.length - 1));
+    return free[Math.floor(Math.random() * free.length)];
+  }
+  mySlot = pickSlot();
+
+  function electSpawner() {
+    const ids = [...peerIds(), selfId()].sort();
+    spawnerId = ids[0];
+  }
+  function selfId() { return window.trystero ? trystero.selfId : 'solo'; }
+  function iAmSpawner() { return spawnerId === selfId(); }
+
+  function myColors() { return SLOT_COLORS[mySlot] || SLOT_COLORS[0]; }
+
+  function setupNet() {
+    if (!window.trystero) {
+      setRelayStatus(false, 'Offline — flying solo');
+      return;
+    }
+    try {
+      room = trystero.joinRoom({ appId: 'anm-holding-pattern-v1' }, roomId);
+    } catch (e) {
+      setRelayStatus(false, 'Offline — flying solo');
+      return;
+    }
+
+    // trystero 0.25: makeAction returns {send, onMessage}; onMessage and the
+    // room's onPeerJoin/onPeerLeave are assignable properties, not registrars
+    const mkAct = (name) => {
+      const a = room.makeAction(name);
+      return [a.send, (fn) => { a.onMessage = fn; }];
+    };
+    const [sendMeta, getMeta]   = mkAct('meta');
+    const [sendState, getState] = mkAct('state');
+    const [sendPos, getPos]     = mkAct('pos');
+    const [sendFire, getFire]   = mkAct('fire');
+    const [sendSpawn, getSpawn] = mkAct('spawn');
+    const [sendDmg, getDmg]     = mkAct('dmg');
+    const [sendKill, getKill]   = mkAct('kill');
+    const [sendEfire, getEfire] = mkAct('efire');
+    const [sendDown, getDown]   = mkAct('down');
+    net = { sendMeta, sendState, sendPos, sendFire, sendSpawn, sendDmg, sendKill, sendEfire, sendDown };
+
+    room.onPeerJoin = (id => {
+      if (peerIds().length + 1 > MAX_PLAYERS) return; // observers beyond cap are ignored
+      ensurePeer(id);
+      electSpawner();
+      sendMeta({ n: myName, s: mySlot }, id);
+      sendState(myState(), id);
+      if (iAmSpawner()) {
+        for (const e of enemies) {
+          sendSpawn({ i: e.id, y: e.y0 / H, x: e.x / W, v: e.speed, A: e.driftAmp, P: e.driftPhase, b: e.big ? 1 : 0, h: e.hp }, id);
+        }
+      }
+      refreshLobby();
+      refreshSquad();
+    });
+
+    room.onPeerLeave = (id => {
+      const p = peers[id];
+      if (p && p.slot >= 0) toast(p.name, 'left the squadron');
+      delete peers[id];
+      electSpawner();
+      refreshLobby();
+      refreshSquad();
+    });
+
+    getMeta((d, id) => {
+      if (typeof d !== 'object' || !d) return;
+      const p = ensurePeer(id);
+      const isNew = p.slot === -1;
+      p.name = cleanName(d.n);
+      p.slot = Math.max(0, Math.min(SLOT_COLORS.length - 1, d.s | 0));
+      // slot clash: the Original never re-picks; between joiners the lower peer id wins
+      if (p.slot === mySlot && !isOriginal && id < selfId()) {
+        mySlot = pickSlot();
+        sendMeta({ n: myName, s: mySlot });
+      }
+      if (isNew) toast(p.name, 'joined the squadron');
+      refreshLobby();
+      refreshSquad();
+    });
+
+    getState((d, id) => {
+      if (typeof d !== 'object' || !d) return;
+      const p = ensurePeer(id);
+      p.kills = d.k | 0;
+      p.hearts = d.h | 0;
+      p.deaths = d.d | 0;
+      if (!p.alive && d.a) p.labelT = 2.5; // back from respawn — flash the callsign
+      p.alive = !!d.a;
+      refreshSquad();
+    });
+
+    getPos((d, id) => {
+      if (!Array.isArray(d)) return;
+      const p = ensurePeer(id);
+      p.tx = d[0] * W;
+      p.ty = d[1] * H;
+      if (!p.hasPos) { p.x = p.tx; p.y = p.ty; p.hasPos = true; p.labelT = 2.5; }
+    });
+
+    getFire((d, id) => {
+      const p = ensurePeer(id);
+      p.shots.push({ x: d[0] * W, y: d[1] * H, age: 0 });
+      if (p.shots.length > 6) p.shots.shift();
+    });
+
+    getSpawn(d => { if (d && typeof d === 'object') applySpawn(d); });
+
+    getDmg(d => {
+      const e = enemies.find(en => en.id === d.i);
+      if (e) { e.hp = d.h; e.flash = 0.1; }
+    });
+
+    getKill((d, id) => {
+      const idx = enemies.findIndex(en => en.id === d.i);
+      if (idx >= 0) {
+        const e = enemies[idx];
+        spawnExplosion(e.x, e.y, e.s, peers[id] ? SLOT_COLORS[peers[id].slot] : null);
+        enemies.splice(idx, 1);
+        sfx.explosion();
+      }
+    });
+
+    getEfire(d => {
+      const e = enemies.find(en => en.id === d.i);
+      if (e) enemyBullets.push({ x: e.x, y: e.y, vx: d.dx * 260, vy: d.dy * 260 });
+    });
+
+    getDown((d, id) => {
+      const p = peers[id];
+      if (p) {
+        if (p.hasPos) spawnExplosion(p.x, p.y, 22, SLOT_COLORS[p.slot]);
+        toast(p.name, 'went down');
+        sfx.down();
+      }
+    });
+
+    electSpawner();
+
+    // periodic sends
+    setInterval(() => {
+      if (!net) return;
+      if (running && !finished && player.alive) {
+        sendPos([player.x / W, player.y / H]);
+      }
+    }, 90);
+    setInterval(() => { if (net) sendState(myState()); }, 2000);
+
+    // relay status + room-full check
+    let fullChecked = false;
+    setInterval(() => {
+      const sockets = trystero.getRelaySockets ? trystero.getRelaySockets() : {};
+      const live = Object.values(sockets).some(s => s && s.readyState === 1);
+      setRelayStatus(live, live ? 'Room live — share the link' : 'Linking relay network…');
+      if (!fullChecked && peerIds().length + 1 > MAX_PLAYERS) {
+        fullChecked = true;
+        roomFull();
+      }
+    }, 800);
+
+    window.addEventListener('pagehide', () => { try { room.leave(); } catch (e) {} });
+  }
+
+  function cleanName(n) {
+    return String(n || '').replace(/[^\x20-\x7EÀ-ɏ]/g, '').trim().slice(0, 12) || 'Pilot';
+  }
+
+  function myState() {
+    return { k: kills, h: player.hearts, d: player.deaths, a: player.alive };
+  }
+  function pushState() { if (net) net.sendState(myState()); refreshSquad(); }
+
+  function roomFull() {
+    try { room.leave(); } catch (e) {}
+    net = null;
+    document.getElementById('name-overlay').classList.add('hidden');
+    document.getElementById('start-overlay').classList.add('hidden');
+    document.getElementById('full-overlay').classList.remove('hidden');
+  }
+  document.getElementById('new-room-btn').addEventListener('click', () => {
+    location.hash = 'r=' + makeRoomId();
+    location.reload();
+  });
+
+  // ------------------------------------------------------------ enemies
+  function applySpawn(d) {
+    const x = (d.x !== undefined ? d.x : 1.05) * W;
+    enemies.push({
+      id: d.i,
+      x, spawnX: x, born: performance.now(),
+      y: d.y * H, y0: d.y * H,
+      s: d.b ? 30 : 20,
+      speed: d.v,
+      driftPhase: d.P, driftAmp: d.A,
+      hp: d.h, big: !!d.b,
+      flash: 0
+    });
+  }
+
+  function spawnEnemy() {
+    const big = Math.random() < 0.18;
+    const d = {
+      i: selfId().slice(0, 4) + (enemyIdCounter++),
+      y: (90 + Math.random() * (H - 180)) / H,
+      v: (big ? 55 : 80) + Math.random() * 50 + Math.min(elapsed / 1000, 60),
+      A: 20 + Math.random() * 40,
+      P: Math.random() * Math.PI * 2,
+      b: big ? 1 : 0,
+      h: big ? 2 : 1
+    };
+    applySpawn(d);
+    if (net) net.sendSpawn(d);
+  }
+
+  function enemyFire(e) {
+    // aim at a random living pilot this client knows about
+    const targets = [];
+    if (player.alive) targets.push({ x: player.x, y: player.y });
+    for (const id of peerIds()) {
+      const p = peers[id];
+      if (p.alive && p.hasPos) targets.push({ x: p.x, y: p.y });
+    }
+    if (!targets.length) return;
+    const t = targets[Math.floor(Math.random() * targets.length)];
+    const dx = t.x - e.x, dy = t.y - e.y;
+    const d = Math.hypot(dx, dy) || 1;
+    enemyBullets.push({ x: e.x, y: e.y, vx: dx / d * 260, vy: dy / d * 260 });
+    if (net) net.sendEfire({ i: e.id, dx: dx / d, dy: dy / d });
+  }
+
+  // Spawner heartbeat. Runs on a timer, not the render loop, because browsers
+  // freeze requestAnimationFrame in background tabs — the squadron's supply of
+  // enemy ships must not depend on whose tab is focused. Uses time-predicted
+  // enemy positions for the same reason.
+  function predictedX(e) {
+    return e.spawnX - e.speed * (performance.now() - e.born) / 1000;
+  }
+  let spawnTickAt = performance.now();
+  setInterval(() => {
+    const now = performance.now();
+    const delta = now - spawnTickAt;
+    spawnTickAt = now;
+    if (!running || paused || finished || !iAmSpawner()) return;
+    spawnTimer -= delta;
+    if (spawnTimer <= 0) {
+      spawnEnemy();
+      const interval = Math.max(700, 1700 - elapsed / 60) / Math.min(playerCount(), 3);
+      spawnTimer = interval * (0.7 + Math.random() * 0.6);
+    }
+    for (const e of enemies) {
+      if (e.fireTimer === undefined) e.fireTimer = 2000 + Math.random() * 4000;
+      e.fireTimer -= delta;
+      const px = predictedX(e);
+      if (e.fireTimer <= 0 && px < W - 120 && px > 150) {
+        e.fireTimer = 2600 + Math.random() * 3800;
+        enemyFire(e);
+      }
+    }
+  }, 200);
+
+  // ------------------------------------------------------------ particles
+  function spawnExplosion(x, y, s, colors) {
+    const c = colors || { main: SLOT_COLORS[mySlot].main, soft: SLOT_COLORS[mySlot].soft };
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 40 + Math.random() * 160;
+      particles.push({
+        kind: 'seg', x, y,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        rot: Math.random() * Math.PI * 2, vrot: (Math.random() - 0.5) * 8,
+        len: 4 + Math.random() * (s * 0.6),
+        life: 1, decay: 1.4 + Math.random() * 0.8, color: GRAY
+      });
+    }
+    particles.push({ kind: 'ring', x, y, r: 4, vr: s * 9, life: 1, decay: 3.2, color: c.main });
+    for (let i = 0; i < 8; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 60 + Math.random() * 120;
+      particles.push({
+        kind: 'dot', x, y,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        r: 1 + Math.random() * 2,
+        life: 1, decay: 2 + Math.random(),
+        color: Math.random() < 0.5 ? c.main : c.soft
+      });
+    }
+  }
+
+  // ------------------------------------------------------------ update
+  function update(dt) {
+    elapsed += dt * 1000;
+    const c = myColors();
+
+    // --- respawn countdown
+    if (!player.alive) {
+      const left = Math.max(0, player.respawnAt - performance.now());
+      document.getElementById('respawn-count').textContent = Math.ceil(left / 1000);
+      if (left <= 0) {
+        player.alive = true;
+        player.hearts = 3;
+        player.invuln = 2;
+        player.labelT = 2.5;
+        player.heat = 0;
+        player.overheated = false;
+        player.x = W * 0.18;
+        player.y = H * 0.5;
+        player.vx = player.vy = 0;
+        document.getElementById('respawn-chip').classList.remove('visible');
+        pushState();
+        updateHearts();
+      }
+    }
+
+    // --- player movement (keyboard + stick)
+    if (player.alive) {
+      const ACC = 2600, MAXV = 460;
+      let ax = 0, ay = 0;
+      if (keys['ArrowLeft'] || keys['a']) ax -= 1;
+      if (keys['ArrowRight'] || keys['d']) ax += 1;
+      if (keys['ArrowUp'] || keys['w']) ay -= 1;
+      if (keys['ArrowDown'] || keys['s']) ay += 1;
+      if (ax && ay) { ax *= 0.7071; ay *= 0.7071; }
+      if (stick.active) {
+        const mag = Math.min(1, Math.hypot(stick.dx, stick.dy) / 56);
+        if (mag > 0.12) {
+          const d = Math.hypot(stick.dx, stick.dy) || 1;
+          ax = stick.dx / d * mag;
+          ay = stick.dy / d * mag;
+        }
+      }
+      player.vx += ax * ACC * dt;
+      player.vy += ay * ACC * dt;
+      const damp = Math.pow(0.0025, dt);
+      player.vx *= damp;
+      player.vy *= damp;
+      const v = Math.hypot(player.vx, player.vy);
+      if (v > MAXV) { player.vx = player.vx / v * MAXV; player.vy = player.vy / v * MAXV; }
+      player.x += player.vx * dt;
+      player.y += player.vy * dt;
+      player.x = Math.max(30, Math.min(W - 30, player.x));
+      player.y = Math.max(70, Math.min(H - 40, player.y));
+
+      player.trail.unshift({ x: player.x - 22, y: player.y, life: 1 });
+      if (player.trail.length > 14) player.trail.pop();
+
+      if (player.invuln > 0) player.invuln -= dt;
+
+      // --- shooting, with overheat: ~5s of sustained fire locks the
+      //     cannons until they cool back down
+      player.cooldown -= dt;
+      player.heat = Math.max(0, player.heat - dt * 0.25);
+      if (player.overheated && player.heat <= 0.3) player.overheated = false;
+      if ((keys[' '] || firePointers > 0) && player.cooldown <= 0 && !player.overheated) {
+        player.cooldown = 0.16;
+        shots += 2;
+        player.heat += 0.07;
+        if (player.heat >= 1) { player.heat = 1; player.overheated = true; }
+        bullets.push({ x: player.x + 16, y: player.y - 11, vx: 780 });
+        bullets.push({ x: player.x + 16, y: player.y + 11, vx: 780 });
+        sfx.laser();
+        if (net && Math.random() < 0.5) net.sendFire([player.x / W, player.y / H]);
+      }
+    }
+    for (const t of player.trail) t.life -= dt * 3.4;
+    bullets = bullets.filter(b => { b.x += b.vx * dt; return b.x < W + 40; });
+
+    // --- stars
+    for (const st of stars) {
+      st.x -= st.v * dt;
+      if (st.x < -4) { st.x = W + 4; st.y = Math.random() * H; }
+    }
+
+    // --- enemies (spawning + fire decisions live on a setInterval so the
+    //     world keeps producing ships even if the spawner's tab is throttled)
+    for (const e of enemies) {
+      e.x -= e.speed * dt;
+      e.driftPhase += dt * 1.4;
+      e.y += Math.sin(e.driftPhase) * e.driftAmp * dt;
+      if (e.flash > 0) e.flash -= dt;
+    }
+    enemies = enemies.filter(e => e.x > -80);
+
+    if (player.labelT > 0) player.labelT -= dt;
+
+    enemyBullets = enemyBullets.filter(b => {
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      return b.x > -20 && b.x < W + 20 && b.y > -20 && b.y < H + 20;
+    });
+
+    // --- my lasers vs enemies
+    for (const b of bullets) {
+      for (const e of enemies) {
+        if (e.hp <= 0) continue;
+        if (Math.abs(b.x - e.x) < e.s * 1.5 && Math.abs(b.y - e.y) < e.s * 1.2) {
+          e.hp--;
+          b.dead = true;
+          hitsLanded++;
+          e.flash = 0.1;
+          if (e.hp <= 0) {
+            kills++;
+            score += e.big ? 250 : 100;
+            spawnExplosion(e.x, e.y, e.s, c);
+            sfx.explosion();
+            if (net) net.sendKill({ i: e.id });
+            pushState();
+          } else if (net) {
+            net.sendDmg({ i: e.id, h: e.hp });
+          }
+          break;
+        }
+      }
+    }
+    bullets = bullets.filter(b => !b.dead);
+    enemies = enemies.filter(e => e.hp > 0);
+
+    // --- me vs enemies / enemy fire
+    if (player.alive && player.invuln <= 0) {
+      let hurt = false;
+      for (const e of enemies) {
+        if (Math.hypot(e.x - player.x, e.y - player.y) < e.s + player.r) {
+          hurt = true;
+          spawnExplosion(e.x, e.y, e.s, c);
+          if (net) net.sendKill({ i: e.id }); // rammed ships go down too, no credit
+          e.hp = 0;
+          break;
+        }
+      }
+      if (!hurt) {
+        for (const b of enemyBullets) {
+          if (Math.hypot(b.x - player.x, b.y - player.y) < player.r) {
+            hurt = true;
+            b.dead = true;
+            break;
+          }
+        }
+      }
+      if (hurt) loseHeart();
+      enemies = enemies.filter(e => e.hp > 0);
+      enemyBullets = enemyBullets.filter(b => !b.dead);
+    }
+
+    // --- ghost interpolation + their cosmetic fire
+    for (const id of peerIds()) {
+      const p = peers[id];
+      if (p.hasPos) {
+        const k = Math.min(1, dt * 10);
+        p.x += (p.tx - p.x) * k;
+        p.y += (p.ty - p.y) * k;
+      }
+      if (p.labelT > 0) p.labelT -= dt;
+      for (const s of p.shots) s.age += dt;
+      p.shots = p.shots.filter(s => s.age < 0.45);
+    }
+
+    // --- particles
+    for (const p of particles) {
+      p.life -= p.decay * dt;
+      if (p.kind === 'ring') { p.r += p.vr * dt; continue; }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vx *= Math.pow(0.2, dt);
+      p.vy *= Math.pow(0.2, dt);
+      if (p.kind === 'seg') p.rot += p.vrot * dt;
+    }
+    particles = particles.filter(p => p.life > 0);
+
+    if (shake > 0) shake -= dt;
+    updateHUD();
+  }
+
+  function loseHeart() {
+    player.hearts--;
+    player.invuln = 1.6;
+    shake = 0.4;
+    updateHearts();
+    if (player.hearts <= 0) {
+      player.alive = false;
+      player.deaths++;
+      player.respawnAt = performance.now() + RESPAWN_SECONDS * 1000;
+      spawnExplosion(player.x, player.y, 24, myColors());
+      document.getElementById('respawn-chip').classList.add('visible');
+      if (net) net.sendDown({});
+      sfx.down();
+    } else {
+      score = Math.max(0, score - 50);
+      spawnExplosion(player.x, player.y, 10, myColors());
+      sfx.hit();
+    }
+    pushState();
+  }
+
+  // ------------------------------------------------------------ HUD
+  const scoreEl = document.getElementById('score-value');
+  const killsEl = document.getElementById('kills-value');
+  const heatFill = document.getElementById('heat-fill');
+  const heatLabel = document.getElementById('heat-label');
+  function updateHUD() {
+    scoreEl.textContent = String(score).padStart(6, '0');
+    killsEl.textContent = kills;
+    heatFill.style.width = (player.heat * 100).toFixed(0) + '%';
+    heatFill.style.background = player.overheated ? '#D93335' : myColors().main;
+    heatLabel.textContent = player.overheated ? 'Cooling…' : 'Weapon';
+    heatLabel.classList.toggle('overheated', player.overheated);
+  }
+  function updateHearts() {
+    const hs = document.querySelectorAll('#hearts .heart');
+    hs.forEach((h, i) => h.classList.toggle('lost', i >= player.hearts));
+  }
+
+  // squad leaderboard
+  const squadPanel = document.getElementById('squad-panel');
+  const squadList = document.getElementById('squad-list');
+  let squadDirty = true;
+  function refreshSquad() { squadDirty = true; }
+  setInterval(() => {
+    if (!squadDirty) return;
+    squadDirty = false;
+    const ids = peerIds().filter(id => peers[id].slot >= 0);
+    const rows = [{ name: myName, slot: mySlot, kills, hearts: player.hearts, alive: player.alive, me: true }];
+    for (const id of ids) {
+      const p = peers[id];
+      rows.push({ name: p.name, slot: p.slot, kills: p.kills, hearts: p.hearts, alive: p.alive, me: false });
+    }
+    rows.sort((a, b) => b.kills - a.kills);
+    squadList.textContent = '';
+    for (const r of rows) {
+      const row = document.createElement('div');
+      row.className = 'squad-row' + (r.alive ? '' : ' down');
+      const dot = document.createElement('span');
+      dot.className = 'squad-dot';
+      dot.style.background = SLOT_COLORS[r.slot].main;
+      const name = document.createElement('span');
+      name.className = 'squad-name';
+      name.textContent = r.name;
+      if (r.me) {
+        const you = document.createElement('span');
+        you.className = 'you';
+        you.textContent = ' — you';
+        name.appendChild(you);
+      }
+      const hearts = document.createElement('span');
+      hearts.className = 'squad-hearts';
+      hearts.style.color = SLOT_COLORS[r.slot].main;
+      hearts.textContent = r.alive ? '♥'.repeat(Math.max(0, r.hearts)) + '♡'.repeat(3 - Math.max(0, r.hearts)) : '☠';
+      const k = document.createElement('span');
+      k.className = 'squad-kills';
+      k.textContent = r.kills;
+      row.append(dot, name, hearts, k);
+      squadList.appendChild(row);
+    }
+  }, 300);
+  setInterval(refreshSquad, 1500);
+
+  // toasts
+  const toastsEl = document.getElementById('toasts');
+  function toast(accent, rest) {
+    const t = document.createElement('div');
+    t.className = 'toast glass';
+    const a = document.createElement('span');
+    a.className = 'accent';
+    a.textContent = accent;
+    t.append(a, document.createTextNode(' ' + rest));
+    toastsEl.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; }, 2600);
+    setTimeout(() => t.remove(), 3100);
+  }
+
+  // lobby
+  const lobbyPlayers = document.getElementById('lobby-players');
+  function refreshLobby() {
+    lobbyPlayers.textContent = '';
+    const all = [{ name: myName + ' (you)', slot: mySlot }];
+    for (const id of peerIds()) {
+      const p = peers[id];
+      if (p.slot >= 0) all.push({ name: p.name, slot: p.slot });
+    }
+    for (const e of all) {
+      const chip = document.createElement('span');
+      chip.className = 'lobby-chip';
+      const dot = document.createElement('span');
+      dot.className = 'squad-dot';
+      dot.style.background = SLOT_COLORS[e.slot].main;
+      chip.append(dot, document.createTextNode(e.name));
+      lobbyPlayers.appendChild(chip);
+    }
+    for (let i = all.length; i < MAX_PLAYERS; i++) {
+      const chip = document.createElement('span');
+      chip.className = 'lobby-chip';
+      chip.style.opacity = '0.45';
+      chip.textContent = 'open seat';
+      lobbyPlayers.appendChild(chip);
+    }
+  }
+
+  function setRelayStatus(live, text) {
+    document.getElementById('relay-dot').classList.toggle('live', live);
+    document.getElementById('relay-text').textContent = text;
+  }
+
+  // ------------------------------------------------------------ drawing
+  function drawTIE(e) {
+    const { x, y, s } = e;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.strokeStyle = e.flash > 0 ? '#9A9AA4' : GRAY;
+    ctx.lineWidth = e.big ? 1.6 : 1.3;
+    ctx.lineJoin = 'round';
+    for (const side of [-1, 1]) {
+      const cx = side * s * 1.05;
+      ctx.beginPath();
+      ctx.moveTo(cx, -s * 1.05);
+      ctx.lineTo(cx + side * s * 0.38, -s * 0.5);
+      ctx.lineTo(cx + side * s * 0.38, s * 0.5);
+      ctx.lineTo(cx, s * 1.05);
+      ctx.lineTo(cx - side * s * 0.38, s * 0.5);
+      ctx.lineTo(cx - side * s * 0.38, -s * 0.5);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx, -s * 1.05);
+      ctx.lineTo(cx, s * 1.05);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx - side * s * 0.38, 0);
+      ctx.lineTo(side * s * 0.46, 0);
+      ctx.stroke();
+    }
+    const r = s * 0.46;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2); ctx.stroke();
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * 0.45, Math.sin(a) * r * 0.45);
+      ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawTargetBrackets(e) {
+    const pad = e.s * 1.7;
+    const arm = e.s * 0.55;
+    ctx.strokeStyle = GRAY_SOFT;
+    ctx.lineWidth = 1.2;
+    for (const [sx, sy] of [[-1,-1],[1,-1],[1,1],[-1,1]]) {
+      ctx.beginPath();
+      ctx.moveTo(e.x + sx * pad, e.y + sy * (pad - arm));
+      ctx.lineTo(e.x + sx * pad, e.y + sy * pad);
+      ctx.lineTo(e.x + sx * (pad - arm), e.y + sy * pad);
+      ctx.stroke();
+    }
+  }
+
+  // callsign pill: player-color background, fully rounded, white text
+  function drawNamePill(g, x, y, text, color, alpha) {
+    g.save();
+    g.globalAlpha = alpha;
+    g.font = '600 10px -apple-system, BlinkMacSystemFont, sans-serif';
+    const tw = g.measureText(text).width;
+    const w = tw + 18, h = 18, r = 9;
+    const px = x - w / 2, py = y - h / 2;
+    g.fillStyle = color;
+    g.beginPath();
+    g.moveTo(px + r, py);
+    g.arcTo(px + w, py, px + w, py + h, r);
+    g.arcTo(px + w, py + h, px, py + h, r);
+    g.arcTo(px, py + h, px, py, r);
+    g.arcTo(px, py, px + w, py, r);
+    g.closePath();
+    g.fill();
+    g.fillStyle = '#FFFFFF';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(text, x, py + h / 2 + 0.5);
+    g.restore();
+    g.globalAlpha = 1;
+  }
+
+  function drawShip(g, x, y, colors, bank, alpha) {
+    const s = 15;
+    g.save();
+    g.globalAlpha = alpha;
+    g.translate(x, y);
+    g.rotate(bank);
+    g.strokeStyle = colors.main;
+    g.fillStyle = colors.main + '14'; // ~8% alpha tint of the player color
+    g.lineWidth = 1.6;
+    g.lineJoin = 'round';
+    g.beginPath();
+    g.moveTo(s * 1.55, 0);
+    g.lineTo(s * 0.35, -s * 0.28);
+    g.lineTo(-s * 0.1, -s * 0.3);
+    g.lineTo(-s * 0.55, -s * 1.05);
+    g.lineTo(-s * 0.95, -s * 1.05);
+    g.lineTo(-s * 0.75, -s * 0.32);
+    g.lineTo(-s * 1.05, -s * 0.22);
+    g.lineTo(-s * 1.05, s * 0.22);
+    g.lineTo(-s * 0.75, s * 0.32);
+    g.lineTo(-s * 0.95, s * 1.05);
+    g.lineTo(-s * 0.55, s * 1.05);
+    g.lineTo(-s * 0.1, s * 0.3);
+    g.lineTo(s * 0.35, s * 0.28);
+    g.closePath();
+    g.fill();
+    g.stroke();
+    g.strokeStyle = colors.deep;
+    g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(s * 0.55, 0); g.lineTo(s * 0.05, 0); g.stroke();
+    for (const side of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(-s * 0.62, side * s * 1.05);
+      g.lineTo(-s * 0.2, side * s * 1.05);
+      g.stroke();
+    }
+    g.fillStyle = colors.soft;
+    for (const side of [-1, 1]) {
+      g.beginPath();
+      g.arc(-s * 1.02, side * s * 0.14, 2.4, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.restore();
+    g.globalAlpha = 1;
+  }
+
+  function drawPlayer() {
+    if (!player.alive) return;
+    const blink = player.invuln > 0 && Math.floor(player.invuln * 12) % 2 === 0;
+    if (blink) return;
+    const c = myColors();
+    for (let i = 0; i < player.trail.length; i++) {
+      const t = player.trail[i];
+      if (t.life <= 0) continue;
+      ctx.globalAlpha = t.life * 0.35;
+      ctx.fillStyle = i % 2 ? c.soft : c.fade;
+      ctx.beginPath();
+      ctx.arc(t.x - i * 2.4, t.y, Math.max(0.5, 4.2 - i * 0.3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    drawShip(ctx, player.x, player.y, c, player.vy * 0.00035, 1);
+    if (player.labelT > 0) {
+      drawNamePill(ctx, player.x, player.y - 34, myName, c.main, Math.min(1, player.labelT * 2));
+    }
+  }
+
+  function drawGhosts() {
+    ctx.font = '600 10px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'center';
+    for (const id of peerIds()) {
+      const p = peers[id];
+      if (!p.hasPos || p.slot < 0) continue;
+      const cols = SLOT_COLORS[p.slot];
+      if (p.alive) {
+        drawShip(ctx, p.x, p.y, cols, 0, 0.55);
+        if (p.labelT > 0) {
+          drawNamePill(ctx, p.x, p.y - 34, p.name, cols.main, Math.min(1, p.labelT * 2) * 0.9);
+        }
+      }
+      // cosmetic laser flashes
+      for (const s of p.shots) {
+        const prog = s.age / 0.45;
+        const bx = s.x + 16 + prog * 350;
+        ctx.globalAlpha = 1 - prog;
+        ctx.strokeStyle = cols.main;
+        ctx.lineWidth = 2;
+        for (const side of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(bx - 14, s.y + side * 11);
+          ctx.lineTo(bx, s.y + side * 11);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  function drawStick() {
+    if (!stick.active) return;
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = '#B9B9C2';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(stick.ox, stick.oy, 42, 0, Math.PI * 2);
+    ctx.stroke();
+    const d = Math.hypot(stick.dx, stick.dy);
+    const cl = d > 42 ? 42 / d : 1;
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = SLOT_COLORS[mySlot].main;
+    ctx.beginPath();
+    ctx.arc(stick.ox + stick.dx * cl, stick.oy + stick.dy * cl, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    if (shake > 0) {
+      ctx.translate((Math.random() - 0.5) * shake * 16, (Math.random() - 0.5) * shake * 16);
+    }
+
+    ctx.fillStyle = 'rgba(160, 160, 172, 0.35)';
+    for (const st of stars) ctx.fillRect(st.x, st.y, st.s, st.s);
+
+    if (enemies.length && player.alive) {
+      let nearest = enemies[0];
+      for (const e of enemies) {
+        if (Math.abs(e.x - player.x) < Math.abs(nearest.x - player.x)) nearest = e;
+      }
+      drawTargetBrackets(nearest);
+    }
+
+    for (const e of enemies) drawTIE(e);
+
+    ctx.strokeStyle = '#B4B4BC';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    for (const b of enemyBullets) {
+      const d = Math.hypot(b.vx, b.vy) || 1;
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x - b.vx / d * 12, b.y - b.vy / d * 12);
+      ctx.stroke();
+    }
+
+    drawGhosts();
+
+    const c = myColors();
+    for (const b of bullets) {
+      ctx.strokeStyle = c.fade;
+      ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(b.x - 16, b.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.strokeStyle = c.main;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.moveTo(b.x - 16, b.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+
+    for (const p of particles) {
+      ctx.globalAlpha = Math.max(0, p.life);
+      if (p.kind === 'ring') {
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.stroke();
+      } else if (p.kind === 'seg') {
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 1.2;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.beginPath(); ctx.moveTo(-p.len / 2, 0); ctx.lineTo(p.len / 2, 0); ctx.stroke();
+        ctx.restore();
+      } else {
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    drawPlayer();
+    ctx.restore();
+    drawStick();
+  }
+
+  // ------------------------------------------------------------ loop
+  let hiddenAt = 0;
+  function frame(ts) {
+    if (!lastTime) lastTime = ts;
+    const dt = Math.min((ts - lastTime) / 1000, 0.05);
+    lastTime = ts;
+    if (running && !paused && !finished) {
+      update(dt);
+      draw();
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ------------------------------------------------------------ flow
+  const nameOverlay = document.getElementById('name-overlay');
+  const startOverlay = document.getElementById('start-overlay');
+  const pauseOverlay = document.getElementById('pause-overlay');
+
+  let stage = 'name'; // name → lobby → flying
+
+  function toHangar() {
+    if (stage !== 'name') return;
+    stage = 'lobby';
+    nameOverlay.classList.add('hidden');
+    startOverlay.classList.remove('hidden');
+    callsignInput.blur();
+  }
+
+  function startGame() {
+    if (running || stage === 'name') return;
+    stage = 'flying';
+    resetLocal();
+    running = true;
+    paused = false;
+    finished = false;
+    elapsed = 0;
+    player.labelT = 2.5;
+    startOverlay.classList.add('hidden');
+    ensureAudio();
+    updateHearts();
+    pushState();
+  }
+
+  // ------------------------------------------------------------ pilot preview
+  const previewCanvas = document.getElementById('preview-canvas');
+  const pctx = previewCanvas.getContext('2d');
+  let previewSlot = -1;
+  function drawPreview() {
+    if (mySlot === previewSlot) return;
+    previewSlot = mySlot;
+    pctx.setTransform(2, 0, 0, 2, 0, 0);
+    pctx.clearRect(0, 0, 220, 140);
+    pctx.save();
+    pctx.translate(110, 70);
+    pctx.scale(2, 2);
+    drawShip(pctx, 0, 0, SLOT_COLORS[mySlot] || SLOT_COLORS[0], 0, 1);
+    pctx.restore();
+  }
+  drawPreview();
+  setInterval(drawPreview, 400); // catches remote-driven color re-picks
+
+  // color picker — cycles colors nobody has claimed; #FF76A2 (slot 0)
+  // can only ever belong to the room's original pilot
+  function freeSlots() {
+    const taken = peerIds().map(id => peers[id].slot);
+    const opts = [];
+    for (let s = 0; s < SLOT_COLORS.length; s++) {
+      if (s === 0 && !isOriginal) continue;
+      if (taken.includes(s)) continue;
+      opts.push(s);
+    }
+    return opts.length ? opts : [mySlot];
+  }
+  function cycleColor(dir) {
+    const opts = freeSlots();
+    const i = opts.indexOf(mySlot);
+    mySlot = opts[(i + dir + opts.length) % opts.length];
+    if (net) net.sendMeta({ n: myName, s: mySlot });
+    drawPreview();
+    refreshLobby();
+    refreshSquad();
+  }
+  document.getElementById('color-prev').addEventListener('click', () => cycleColor(-1));
+  document.getElementById('color-next').addEventListener('click', () => cycleColor(1));
+
+  // copy invite link
+  document.getElementById('copy-btn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const url = location.href;
+    let ok = false;
+    try { await navigator.clipboard.writeText(url); ok = true; } catch (err) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        ok = document.execCommand('copy');
+        ta.remove();
+      } catch (e2) {}
+    }
+    btn.textContent = ok ? 'Link copied ✓' : url;
+    setTimeout(() => { btn.textContent = 'Copy invite link'; }, 2200);
+  });
+
+  // callsign
+  const callsignInput = document.getElementById('callsign-input');
+  callsignInput.value = myName;
+  callsignInput.addEventListener('input', () => {
+    myName = cleanName(callsignInput.value) || myName;
+    localStorage.setItem('hp-callsign', myName);
+    if (net) net.sendMeta({ n: myName, s: mySlot });
+    refreshLobby();
+    refreshSquad();
+  });
+
+  // ------------------------------------------------------------ input: keyboard
+  const isTyping = () => document.activeElement && document.activeElement.tagName === 'INPUT';
+
+  window.addEventListener('keydown', (e) => {
+    if (isTyping()) {
+      if (e.key === 'Enter') toHangar();
+      return;
+    }
+    if (stage === 'name') {
+      if (e.key === 'Enter') toHangar();
+      return;
+    }
+    if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (!running) { startGame(); return; }
+    if (paused) { paused = false; pauseOverlay.classList.add('hidden'); lastTime = 0; return; }
+    if (finished) return;
+    if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
+      paused = true;
+      pauseOverlay.classList.remove('hidden');
+      return;
+    }
+    keys[e.key.length === 1 ? e.key.toLowerCase() : e.key] = true;
+  });
+  window.addEventListener('keyup', (e) => {
+    keys[e.key.length === 1 ? e.key.toLowerCase() : e.key] = false;
+  });
+
+  // ------------------------------------------------------------ input: touch / pointer
+  // left side of the screen: drag joystick — right side: tap / hold to fire
+  const activeFirePointers = new Set();
+
+  canvas.addEventListener('pointerdown', (e) => {
+    ensureAudio();
+    if (!running) { startGame(); return; }
+    if (paused) { paused = false; pauseOverlay.classList.add('hidden'); lastTime = 0; return; }
+    if (finished || !player.alive) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (e.clientX < W * 0.45) {
+      if (!stick.active) {
+        stick.active = true;
+        stick.id = e.pointerId;
+        stick.ox = e.clientX;
+        stick.oy = e.clientY;
+        stick.dx = stick.dy = 0;
+      }
+    } else {
+      activeFirePointers.add(e.pointerId);
+      firePointers = activeFirePointers.size;
+    }
+    e.preventDefault();
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    if (stick.active && e.pointerId === stick.id) {
+      stick.dx = e.clientX - stick.ox;
+      stick.dy = e.clientY - stick.oy;
+    }
+  });
+
+  function releasePointer(e) {
+    if (stick.active && e.pointerId === stick.id) {
+      stick.active = false;
+      stick.dx = stick.dy = 0;
+    }
+    activeFirePointers.delete(e.pointerId);
+    firePointers = activeFirePointers.size;
+  }
+  window.addEventListener('pointerup', releasePointer);
+  window.addEventListener('pointercancel', releasePointer);
+
+  // tap anywhere on lobby to launch (except interactive elements)
+  startOverlay.addEventListener('pointerdown', (e) => {
+    if (['INPUT', 'BUTTON'].includes(e.target.tagName)) return;
+    ensureAudio();
+    startGame();
+  });
+
+  document.getElementById('hangar-btn').addEventListener('click', () => {
+    ensureAudio();
+    toHangar();
+  });
+
+  // ------------------------------------------------------------ visibility
+  // Solo: pause like the dino game. Multiplayer: keep the world moving —
+  // fast-forward the sim on return so we stay in step with the squadron.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      hiddenAt = performance.now();
+      for (const k in keys) keys[k] = false;
+      stick.active = false;
+      activeFirePointers.clear();
+      firePointers = 0;
+      if (running && !finished && peerIds().length === 0) {
+        paused = true;
+        pauseOverlay.classList.remove('hidden');
+      }
+    } else if (running && !paused && !finished && hiddenAt) {
+      const away = Math.min(performance.now() - hiddenAt, 8000);
+      player.invuln = Math.max(player.invuln, 1);
+      const steps = Math.floor(away / 16);
+      const soundWas = soundOn;
+      soundOn = false;
+      for (let i = 0; i < steps; i++) update(0.016);
+      soundOn = soundWas;
+      lastTime = 0;
+    }
+  });
+
+  window.addEventListener('blur', () => {
+    for (const k in keys) keys[k] = false;
+  });
+
+  // ------------------------------------------------------------ init
+  document.getElementById('room-code').textContent = roomId;
+  if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+    document.getElementById('launch-hint').textContent = 'Tap to launch — drag left to fly, tap right to fire';
+  }
+  refreshLobby();
+  setupNet();
+})();
+</script>
+</body>
+</html>
