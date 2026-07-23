@@ -264,6 +264,14 @@
   }
   #respawn-chip.visible { display: block; }
   #respawn-count { font-weight: 600; color: var(--pink-deep); }
+  #respawn-standings {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line-soft);
+    min-width: 200px;
+    text-align: left;
+  }
+  #respawn-standings:empty { display: none; }
 
   /* toasts — bottom center */
   #toasts {
@@ -649,6 +657,7 @@
 
 <canvas id="game"></canvas>
 
+
 <!-- HUD -->
 <div class="hud glass" id="score-panel">
   <div>
@@ -689,7 +698,8 @@
 </div>
 
 <div class="hud glass" id="respawn-chip">
-  Ship destroyed — respawning in <span id="respawn-count">5</span>
+  <div id="respawn-msg">Ship destroyed — respawning in <span id="respawn-count">5</span></div>
+  <div id="respawn-standings"></div>
 </div>
 
 <div id="toasts"></div>
@@ -1377,6 +1387,7 @@
         player.ang = mode === 'zero' ? -Math.PI / 2 : 0;
         player.vx = player.vy = 0;
         document.getElementById('respawn-chip').classList.remove('visible');
+        document.getElementById('respawn-standings').textContent = '';
         pushState();
         updateHearts();
       }
@@ -1617,6 +1628,7 @@
       player.respawnAt = performance.now() + RESPAWN_SECONDS * 1000;
       spawnExplosion(player.x, player.y, 24, myColors());
       document.getElementById('respawn-chip').classList.add('visible');
+      renderStandings();
       if (net) net.sendDown({});
       sfx.down();
     } else {
@@ -1645,12 +1657,14 @@
     hs.forEach((h, i) => h.classList.toggle('lost', i >= player.hearts));
   }
 
-  // standings — rendered into the pause popup (the live HUD leaderboard was
-  // replaced by the Pause / Share icons, so standings surface on pause)
-  const squadList = document.getElementById('pause-standings');
+  // standings — the live HUD leaderboard was replaced by the Pause / Share
+  // icons, so standings surface where there's downtime: the pause popup and
+  // the respawn wait.
+  const pauseStandings = document.getElementById('pause-standings');
+  const respawnStandings = document.getElementById('respawn-standings');
   let squadDirty = true;
   function refreshSquad() { squadDirty = true; }
-  function renderStandings() {
+  function buildStandings(el) {
     const ids = peerIds().filter(id => peers[id].slot >= 0);
     const rows = [{ name: myName, slot: mySlot, kills, hearts: player.hearts, alive: player.alive, me: true }];
     for (const id of ids) {
@@ -1658,7 +1672,7 @@
       rows.push({ name: p.name, slot: p.slot, kills: p.kills, hearts: p.hearts, alive: p.alive, me: false });
     }
     rows.sort((a, b) => b.kills - a.kills);
-    squadList.textContent = '';
+    el.textContent = '';
     for (const r of rows) {
       const row = document.createElement('div');
       row.className = 'squad-row' + (r.alive ? '' : ' down');
@@ -1682,10 +1696,16 @@
       k.className = 'squad-kills';
       k.textContent = r.kills;
       row.append(dot, name, hearts, k);
-      squadList.appendChild(row);
+      el.appendChild(row);
     }
   }
-  setInterval(() => { if (squadDirty && paused) { squadDirty = false; renderStandings(); } }, 300);
+  function renderStandings() {
+    if (paused) buildStandings(pauseStandings);
+    if (!player.alive) buildStandings(respawnStandings);
+  }
+  setInterval(() => {
+    if (squadDirty && (paused || !player.alive)) { squadDirty = false; renderStandings(); }
+  }, 300);
   setInterval(refreshSquad, 1500);
 
   // toasts
