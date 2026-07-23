@@ -981,7 +981,7 @@
     if (!p) {
       p = peers[id] = {
         name: '· · ·', slot: -1, kills: 0, hearts: 3, deaths: 0, alive: true,
-        playing: false,
+        playing: false, visible: true,
         x: -100, y: -100, tx: -100, ty: -100, ang: 0, tAng: 0,
         hasPos: false, shots: [], labelT: 0, lastSeen: 0
       };
@@ -1004,11 +1004,22 @@
   mySlot = pickSlot();
 
   function selfId() { return window.trystero ? trystero.selfId : 'solo'; }
-  // The spawner is the lowest-id pilot who is currently *playing*. Backups
-  // take over when higher-priority spawners go silent (see the spawn loop),
-  // so enemies keep coming even if the primary backgrounds their tab or drops.
+  // Spawn duty belongs to the lowest-id pilot who is playing AND has their tab
+  // in the foreground. Browsers throttle background tabs (so an alt-tabbed
+  // spawner would trickle enemies), and freeze their render loop entirely — so
+  // we hand spawning to a foreground player, keeping a full-rate enemy stream.
+  // lastSpawnAt staleness (in the spawn loop) is a further backstop for a peer
+  // whose "hidden" flag hasn't propagated yet.
   function playingSpawnerIds() {
-    return [selfId(), ...peerIds().filter(id => peers[id].playing)].sort();
+    const playing = [];
+    if (running && !finished) playing.push(selfId());
+    for (const id of peerIds()) if (peers[id].playing) playing.push(id);
+    const isVisible = (id) => id === selfId() ? !document.hidden : peers[id].visible;
+    const visible = playing.filter(isVisible);
+    // prefer foreground pilots; if nobody reports visible (unreliable signal
+    // or everyone's backgrounded), fall back to all playing pilots so waves
+    // never stall on a bad visibility read
+    return (visible.length ? visible : playing).sort();
   }
   function amPrimarySpawner() { return playingSpawnerIds()[0] === selfId(); }
 
@@ -1111,6 +1122,7 @@
       if (!p.alive && d.a) p.labelT = 2.5; // back from respawn — flash the callsign
       p.alive = !!d.a;
       p.playing = !!d.p;
+      p.visible = d.v !== undefined ? !!d.v : true;
       refreshSquad();
     });
 
@@ -1210,7 +1222,7 @@
   }
 
   function myState() {
-    return { n: myName, s: mySlot, k: kills, h: player.hearts, d: player.deaths, a: player.alive, p: running && !finished };
+    return { n: myName, s: mySlot, k: kills, h: player.hearts, d: player.deaths, a: player.alive, p: running && !finished, v: !document.hidden };
   }
   function pushState() { if (net) net.sendState(myState()); refreshSquad(); }
 
@@ -1319,6 +1331,7 @@
     // over after a short grace period — so waves never dry up mid-game.
     const order = playingSpawnerIds();
     const myIndex = order.indexOf(selfId());
+    if (myIndex < 0) return; // backgrounded — leave spawning to a foreground pilot
     const iDrive = myIndex === 0 || (now - lastSpawnAt) > myIndex * SPAWN_TAKEOVER_MS;
     if (!iDrive) return;
     spawnTimer -= delta;
@@ -2321,6 +2334,10 @@
   // Solo: pause like the dino game. Multiplayer: keep the world moving —
   // fast-forward the sim on return so we stay in step with the squadron.
   document.addEventListener('visibilitychange', () => {
+    // tell the squadron immediately whether I can carry spawn duty, so a
+    // foreground pilot picks it up the moment I tab away (and I reclaim it on
+    // return) instead of waiting for the next 2s state tick
+    if (net) pushState();
     if (document.hidden) {
       hiddenAt = performance.now();
       for (const k in keys) keys[k] = false;
@@ -2336,10 +2353,9 @@
       player.invuln = Math.max(player.invuln, 1);
       const steps = Math.floor(away / 16);
       const soundWas = soundOn;
-      soundOn = false;
-      for (let i = 0; i < steps; i++) update(0.016);
-      soundOn = soundWas;
-      lastTime = 0;
+      soundOn = false; // silence the fast-forward catch-up…
+      try { for (let i = 0; i < steps; i++) update(0.016); }
+      finally { soundOn = soundWas; lastTime = 0; } // …but always restore, even if a step throws
     }
   });
 
@@ -2353,6 +2369,9 @@
   (stage === 'mode' ? modeOverlay : nameOverlay).classList.remove('hidden');
   refreshLobby();
   setupNet();
+
+  // TEMP audio diagnostic — remove before shipping
+  window.__audioState = () => ({ soundOn, ctx: audioCtx ? audioCtx.state : 'null' });
 })();
 </script>
 </body>
