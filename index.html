@@ -158,13 +158,16 @@
     max-width: 250px;
     text-align: left;
   }
-  .pause-actions {
+  .pause-icons {
     display: flex;
-    gap: 10px;
+    gap: 12px;
     justify-content: center;
     align-items: center;
-    flex-wrap: wrap;
     margin-bottom: 18px;
+  }
+  /* the keyboard hint is desktop-only; touch resumes via the button */
+  @media (pointer: coarse) {
+    #pause-hint { display: none; }
   }
   #heat-track {
     width: 64px;
@@ -345,6 +348,12 @@
     letter-spacing: -0.01em;
     color: var(--ink);
     margin-bottom: 10px;
+  }
+  /* brand hero — the game name shown in pink to stand apart from screen titles */
+  .overlay-title.brand {
+    color: var(--pink);
+    font-weight: 300;
+    margin-bottom: 14px;
   }
   .overlay-sub {
     font-size: 13px;
@@ -707,8 +716,7 @@
 <!-- Mode select overlay (room creators only) -->
 <div class="overlay hidden" id="mode-overlay">
   <div class="overlay-card glass">
-    <div class="overlay-kicker">Advanced New Media</div>
-    <div class="overlay-title">Sweet Spaceship</div>
+    <div class="overlay-title brand">Sweet Spaceship</div>
     <div class="overlay-sub">Pick your mission — your friends join whichever you choose.</div>
     <div id="mode-row">
       <button class="mode-btn" id="mode-classic">
@@ -726,7 +734,7 @@
 <!-- Pilot customization overlay -->
 <div class="overlay hidden" id="name-overlay">
   <div class="overlay-card glass">
-    <div class="overlay-kicker">Advanced New Media</div>
+    <div class="overlay-kicker">Sweet Spaceship</div>
     <div class="overlay-title">Name your pilot</div>
     <div class="overlay-sub">
       Your callsign shows above your ship for a moment when you launch.
@@ -750,8 +758,7 @@
 <!-- Lobby overlay -->
 <div class="overlay hidden" id="start-overlay">
   <div class="overlay-card glass">
-    <div class="overlay-kicker">Advanced New Media</div>
-    <div class="overlay-title">Sweet Spaceship</div>
+    <div class="overlay-title brand">Sweet Spaceship</div>
     <div class="overlay-sub" id="lobby-sub">
       Clear the sector — and bring up to three friends.
       Most ships destroyed tops the leaderboard.
@@ -774,14 +781,20 @@
     <div class="overlay-title">Paused</div>
     <div id="pause-standings-title">Standings</div>
     <div id="pause-standings"></div>
-    <div class="pause-actions">
+    <div class="pause-icons">
       <div class="share-wrap">
-        <button class="btn btn-ghost" id="pause-share">Copy invite link</button>
+        <button class="icon-btn glass" id="pause-share" aria-label="Copy invite link" title="Copy invite link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><polyline points="8 7 12 3 16 7"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </button>
         <div class="share-tip" id="pause-share-tip">Link copied</div>
       </div>
-      <button class="btn btn-ghost" id="pause-mute">Mute sound</button>
+      <button class="icon-btn glass" id="pause-mute" aria-label="Mute sound" title="Mute sound"></button>
     </div>
-    <div class="overlay-hint"><span class="pulse">Press any key or tap to resume</span></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="pause-resume">Resume</button>
+      <button class="btn btn-ghost" id="pause-exit">Back to main menu</button>
+    </div>
+    <div class="overlay-hint" id="pause-hint"><span class="pulse">Press Esc to resume</span></div>
   </div>
 </div>
 
@@ -1419,15 +1432,19 @@
         if (keys['ArrowUp'] || keys['w']) thrust = THRUST;
         else if (keys['ArrowDown'] || keys['s']) thrust = -REVERSE;
         if (stick.active) {
+          // Touch: the stick aims the nose (snappy — not the slow key-turn) and
+          // sets throttle by push distance. Thrust eases in as the nose lines up,
+          // so a hard reversal rotates first instead of flinging you backward.
+          // That slow rotate-while-thrusting is what made the old feel floaty.
           const mag = Math.min(1, Math.hypot(stick.dx, stick.dy) / 56);
           if (mag > 0.12) {
             const target = Math.atan2(stick.dy, stick.dx);
             let diff = target - player.ang;
             while (diff > Math.PI) diff -= Math.PI * 2;
             while (diff < -Math.PI) diff += Math.PI * 2;
-            const step = ROT * dt;
-            player.ang += Math.abs(diff) < step ? diff : Math.sign(diff) * step;
-            thrust = THRUST * mag;
+            player.ang += diff * Math.min(1, dt * 16);
+            const aim = Math.max(0, Math.cos(diff));
+            thrust = THRUST * mag * (0.3 + 0.7 * aim);
           }
         }
         player.vx += Math.cos(player.ang) * thrust * dt;
@@ -2129,12 +2146,22 @@
   }
 
   // ------------------------------------------------------------ pause / share
+  const pauseMuteBtn = document.getElementById('pause-mute');
+  const SPEAKER_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 4 15 8 15 13 19 13 5 8 9 4 9"/><path d="M17 8a5 5 0 0 1 0 8"/></svg>';
+  const SPEAKER_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 9 4 15 8 15 13 19 13 5 8 9 4 9"/><line x1="16.5" y1="9.5" x2="21.5" y2="14.5"/><line x1="21.5" y1="9.5" x2="16.5" y2="14.5"/></svg>';
+  function updateMuteIcon() {
+    pauseMuteBtn.innerHTML = soundOn ? SPEAKER_ON : SPEAKER_OFF;
+    pauseMuteBtn.title = soundOn ? 'Mute sound' : 'Unmute sound';
+    pauseMuteBtn.setAttribute('aria-label', pauseMuteBtn.title);
+  }
+  updateMuteIcon();
+
   function openPause() {
     if (!running || finished || paused) return;
     paused = true;
     squadDirty = true;
     renderStandings();
-    document.getElementById('pause-mute').textContent = soundOn ? 'Mute sound' : 'Unmute sound';
+    updateMuteIcon();
     pauseOverlay.classList.remove('hidden');
   }
   function closePause() {
@@ -2168,15 +2195,15 @@
     copyInvite(document.getElementById('share-tip'));
   });
   document.getElementById('pause-share').addEventListener('click', () => copyInvite(document.getElementById('pause-share-tip')));
-  document.getElementById('pause-mute').addEventListener('click', (e) => {
+  pauseMuteBtn.addEventListener('click', () => {
     soundOn = !soundOn;
     if (soundOn) ensureAudio();
-    e.currentTarget.textContent = soundOn ? 'Mute sound' : 'Unmute sound';
+    updateMuteIcon();
   });
-  // tap the backdrop (not a button) to resume — matters on touch devices
-  pauseOverlay.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('button')) return;
-    closePause();
+  document.getElementById('pause-resume').addEventListener('click', closePause);
+  document.getElementById('pause-exit').addEventListener('click', () => {
+    // leave the current game and return to the app's first screen (a fresh room)
+    location.href = location.pathname;
   });
 
   // ------------------------------------------------------------ pilot preview
@@ -2266,7 +2293,10 @@
     }
     if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
     if (!running) { startGame(); return; }
-    if (paused) { closePause(); return; }
+    if (paused) {
+      if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') closePause();
+      return; // only a specific key resumes — no more "any key"
+    }
     if (finished) return;
     if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') { openPause(); return; }
     keys[e.key.length === 1 ? e.key.toLowerCase() : e.key] = true;
@@ -2282,7 +2312,7 @@
   canvas.addEventListener('pointerdown', (e) => {
     ensureAudio();
     if (!running) { startGame(); return; }
-    if (paused) { closePause(); return; }
+    if (paused) return; // resume via the Resume button, not a tap anywhere
     if (finished || !player.alive) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (e.clientX < W * 0.45) {
@@ -2369,9 +2399,6 @@
   (stage === 'mode' ? modeOverlay : nameOverlay).classList.remove('hidden');
   refreshLobby();
   setupNet();
-
-  // TEMP audio diagnostic — remove before shipping
-  window.__audioState = () => ({ soundOn, ctx: audioCtx ? audioCtx.state : 'null' });
 })();
 </script>
 </body>
