@@ -415,7 +415,7 @@
     line-height: 1.5;
     color: var(--ink-soft);
   }
-  #mode-chip {
+  #mode-chip, #ff-chip {
     padding: 10px 14px;
     border-radius: 12px;
     border: 1px solid var(--line-soft);
@@ -428,6 +428,46 @@
     display: flex;
     align-items: center;
   }
+  #ff-chip { color: var(--pink-deep); border-color: var(--pink-soft); background: var(--pink-fade); }
+
+  /* friendly-fire toggle on the mode screen */
+  .ff-toggle {
+    margin: 18px auto 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line-soft);
+    background: rgba(255, 255, 255, 0.5);
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .ff-toggle:hover { border-color: var(--line); }
+  .ff-switch {
+    width: 34px;
+    height: 18px;
+    border-radius: 999px;
+    background: #D6D6DC;
+    position: relative;
+    flex: none;
+    transition: background 0.2s ease;
+  }
+  .ff-knob {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(60,60,70,0.25);
+    transition: left 0.2s ease;
+  }
+  .ff-toggle.on { color: var(--pink-deep); border-color: var(--pink-soft); }
+  .ff-toggle.on .ff-switch { background: var(--pink); }
+  .ff-toggle.on .ff-knob { left: 18px; }
 
   /* pilot preview + color picker */
   #preview-wrap {
@@ -728,6 +768,10 @@
         <span class="mode-desc">Rotate &amp; thrust, drift on momentum. No walls, and enemies come from everywhere.</span>
       </button>
     </div>
+    <button class="ff-toggle" id="ff-toggle" role="switch" aria-checked="false">
+      <span class="ff-switch"><span class="ff-knob"></span></span>
+      <span>Friendly fire — pilots can hit each other</span>
+    </button>
   </div>
 </div>
 
@@ -765,6 +809,7 @@
     </div>
     <div id="room-row">
       <div id="mode-chip">Trench Run</div>
+      <div id="ff-chip" style="display:none">Friendly fire</div>
       <div id="room-code">·····</div>
       <button id="copy-btn">Copy invite link</button>
     </div>
@@ -903,6 +948,7 @@
     explosion() { noiseBurst(0.35, 0.16); beep('sine', 180, 0.25, 0.08, 60); },
     hit()       { noiseBurst(0.2, 0.1); beep('sine', 120, 0.3, 0.1, 40); },
     down()      { noiseBurst(0.55, 0.2); beep('sine', 200, 0.5, 0.1, 30); },
+    rock()      { noiseBurst(0.16, 0.08); beep('sine', 150, 0.14, 0.05, 80); },
     ready()     { beep('sine', 660, 0.12, 0.07); setTimeout(() => beep('sine', 990, 0.25, 0.07), 130); }
   };
 
@@ -922,8 +968,10 @@
   };
 
   let bullets = [], enemyBullets = [], enemies = [], particles = [], stars = [];
+  let meteors = [];
   let score = 0, kills = 0, shots = 0, hitsLanded = 0;
   let spawnTimer = 1000, enemyIdCounter = 0;
+  let meteorTimer = 1500, meteorIdCounter = 0;
   let shake = 0;
 
   // touch controls
@@ -951,6 +999,8 @@
     player.trail = [];
     bullets = [];
     particles = [];
+    meteors = [];
+    meteorTimer = 1800;
     shake = 0;
     initStars();
   }
@@ -972,11 +1022,12 @@
   const isOriginal = !roomId;
   if (!roomId) roomId = makeRoomId();
 
-  // game mode travels in the invite link so the whole room plays the same one:
-  // 'classic' = Trench Run, 'zero' = Zero G (rotate & thrust, wrap-around)
+  // game mode + friendly-fire flag travel in the invite link so the whole room
+  // shares them. 'classic' = Trench Run, 'zero' = Zero G. f=1 = friendly fire on.
   let mode = /(^|[#&])m=z/.test(location.hash) ? 'zero' : 'classic';
+  let friendlyFire = /(^|[#&])f=1/.test(location.hash);
   function writeHash() {
-    const h = '#r=' + roomId + (mode === 'zero' ? '&m=z' : '');
+    const h = '#r=' + roomId + (mode === 'zero' ? '&m=z' : '') + (friendlyFire ? '&f=1' : '');
     try { history.replaceState(null, '', h); } catch (e) { location.hash = h.slice(1); }
   }
   writeHash();
@@ -1076,7 +1127,10 @@
     const [sendKill, getKill]   = mkAct('kill');
     const [sendEfire, getEfire] = mkAct('efire');
     const [sendDown, getDown]   = mkAct('down');
-    net = { sendMeta, sendState, sendPos, sendFire, sendSpawn, sendDmg, sendKill, sendEfire, sendDown };
+    const [sendMspawn, getMspawn] = mkAct('mspawn');
+    const [sendMhit, getMhit]     = mkAct('mhit');
+    const [sendPvp, getPvp]       = mkAct('pvp');
+    net = { sendMeta, sendState, sendPos, sendFire, sendSpawn, sendDmg, sendKill, sendEfire, sendDown, sendMspawn, sendMhit, sendPvp };
 
     room.onPeerJoin = (id => {
       if (peerIds().length + 1 > MAX_PLAYERS) return; // observers beyond cap are ignored
@@ -1090,6 +1144,7 @@
           else { d.A = e.driftAmp; d.P = e.driftPhase; }
           sendSpawn(d, id);
         }
+        for (const m of meteors) sendMspawn(meteorSpec(m), id);
       }
       refreshLobby();
       refreshSquad();
@@ -1174,6 +1229,24 @@
     getEfire(d => {
       const e = enemies.find(en => en.id === d.i);
       if (e) enemyBullets.push({ x: e.x, y: e.y, vx: d.dx * 260, vy: d.dy * 260 });
+    });
+
+    getMspawn(d => { if (d && typeof d === 'object') applyMeteorSpawn(d); });
+
+    getMhit(d => {
+      const idx = meteors.findIndex(m => m.id === d.i);
+      if (idx < 0) return; // already broken here (a race) — ignore
+      const m = meteors[idx];
+      meteorDebris(m.x, m.y, m.r);
+      sfx.rock();
+      meteors.splice(idx, 1);
+      if (Array.isArray(d.cs)) for (const c of d.cs) applyMeteorSpawn(c);
+    });
+
+    // friendly fire: a peer's laser tagged me. The victim is authoritative for
+    // its own health, so I take the hit here (invuln check blocks burst-wipes).
+    getPvp(() => {
+      if (friendlyFire && player.alive && player.invuln <= 0) loseHeart();
     });
 
     getDown((d, id) => {
@@ -1353,6 +1426,11 @@
       const interval = Math.max(700, 1700 - elapsed / 60) / Math.min(playerCount(), 3);
       spawnTimer = interval * (0.7 + Math.random() * 0.6);
     }
+    meteorTimer -= delta;
+    if (meteorTimer <= 0) {
+      spawnMeteor();
+      meteorTimer = 2600 + Math.random() * 3000;
+    }
     for (const e of enemies) {
       if (e.fireTimer === undefined) e.fireTimer = 2000 + Math.random() * 4000;
       e.fireTimer -= delta;
@@ -1390,6 +1468,89 @@
         color: Math.random() < 0.5 ? c.main : c.soft
       });
     }
+  }
+
+  // ------------------------------------------------------------ meteors (shared)
+  // Neutral hazards, synced like enemies: the spawner broadcasts each rock, and
+  // whoever shoots one broadcasts the split so everyone sees the same field.
+  // Meteors score points but never count toward ships-destroyed (that stays a
+  // fight between pilots). Shape is cosmetic, so it's generated per-client.
+  const METEOR_R = [11, 20, 32]; // radius per tier: small, medium, big
+  function makeMeteor(id, x, y, tier, vx, vy) {
+    const pts = 8 + Math.floor(Math.random() * 4);
+    const shape = [];
+    for (let i = 0; i < pts; i++) shape.push(0.72 + Math.random() * 0.4);
+    return {
+      id, x, y, tier, r: METEOR_R[tier], vx, vy, age: 0,
+      rot: Math.random() * Math.PI * 2, vrot: (Math.random() - 0.5) * 1.6,
+      shape
+    };
+  }
+  // specs carry position normalized to W/H so meteors land in the same relative
+  // spot on every pilot's screen regardless of window size (as enemies do)
+  function meteorSpec(m) { return { i: m.id, x: m.x / W, y: m.y / H, vx: m.vx, vy: m.vy, t: m.tier }; }
+  function applyMeteorSpawn(s) { meteors.push(makeMeteor(s.i, s.x * W, s.y * H, s.t, s.vx, s.vy)); }
+  function meteorId() { return 'm' + selfId().slice(0, 4) + (meteorIdCounter++); }
+
+  // spawner only — mirrors spawnEnemy
+  function spawnMeteor() {
+    const tier = Math.random() < 0.6 ? 2 : 1; // arrive as big or medium
+    const speed = 60 + Math.random() * 70;
+    let x, y, vx, vy;
+    if (mode === 'zero') {
+      const edge = Math.floor(Math.random() * 4), t = Math.random();
+      x = edge === 0 ? -40 : edge === 1 ? W + 40 : t * W;
+      y = edge === 2 ? -40 : edge === 3 ? H + 40 : t * H;
+      const tx = (0.3 + Math.random() * 0.4) * W - x, ty = (0.3 + Math.random() * 0.4) * H - y;
+      const d = Math.hypot(tx, ty) || 1;
+      vx = tx / d * speed; vy = ty / d * speed;
+    } else {
+      x = W + 50; y = 80 + Math.random() * (H - 160);
+      vx = -speed; vy = (Math.random() - 0.5) * 30;
+    }
+    const spec = { i: meteorId(), x: x / W, y: y / H, vx, vy, t: tier };
+    applyMeteorSpawn(spec);
+    if (net) net.sendMspawn(spec);
+  }
+  function meteorDebris(x, y, r) {
+    for (let i = 0; i < Math.max(4, Math.floor(r / 2)); i++) {
+      const a = Math.random() * Math.PI * 2, sp = 40 + Math.random() * 120;
+      particles.push({
+        kind: 'seg', x, y,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        rot: Math.random() * Math.PI * 2, vrot: (Math.random() - 0.5) * 8,
+        len: 3 + Math.random() * (r * 0.4),
+        life: 1, decay: 1.6 + Math.random(), color: GRAY
+      });
+    }
+  }
+  function removeMeteor(m) { const i = meteors.indexOf(m); if (i >= 0) meteors.splice(i, 1); }
+
+  // Local hits — I compute the outcome, apply it, and broadcast so peers match.
+  // Laser: split into smaller shards (I score). Ram: just shatter (no shards to
+  // chain-hit me, no score). A remote peer applies the same via getMhit.
+  function splitMeteorLocal(m) {
+    score += m.tier === 0 ? 30 : 15;
+    meteorDebris(m.x, m.y, m.r);
+    sfx.rock();
+    const cs = [];
+    if (m.tier > 0) {
+      const n = 2 + (Math.random() < 0.5 ? 1 : 0);
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2, sp = 50 + Math.random() * 70;
+        cs.push({ i: meteorId(), x: m.x / W, y: m.y / H, t: m.tier - 1,
+          vx: m.vx * 0.5 + Math.cos(a) * sp, vy: m.vy * 0.5 + Math.sin(a) * sp });
+      }
+    }
+    removeMeteor(m);
+    for (const c of cs) applyMeteorSpawn(c);
+    if (net) net.sendMhit({ i: m.id, cs });
+  }
+  function shatterMeteorLocal(m) {
+    meteorDebris(m.x, m.y, m.r);
+    sfx.rock();
+    removeMeteor(m);
+    if (net) net.sendMhit({ i: m.id, cs: [] });
   }
 
   // ------------------------------------------------------------ update
@@ -1554,6 +1715,16 @@
         ? !(e.age > 3 && (e.x < -150 || e.x > W + 150 || e.y < -150 || e.y > H + 150))
         : e.x > -80);
 
+    // --- meteors: drift, rotate, despawn off-screen (spawning is spawner-driven)
+    for (const m of meteors) {
+      m.age += dt;
+      m.x += m.vx * dt;
+      m.y += m.vy * dt;
+      m.rot += m.vrot * dt;
+    }
+    meteors = meteors.filter(m =>
+      !(m.age > 3 && (m.x < -80 || m.x > W + 80 || m.y < -120 || m.y > H + 120)));
+
     if (player.labelT > 0) player.labelT -= dt;
 
     enemyBullets = enemyBullets.filter(b => {
@@ -1588,6 +1759,38 @@
     bullets = bullets.filter(b => !b.dead);
     enemies = enemies.filter(e => e.hp > 0);
 
+    // --- my lasers vs meteors → shatter into smaller shards (synced)
+    for (const b of bullets) {
+      if (b.dead) continue;
+      for (const m of meteors) {
+        if (Math.hypot(b.x - m.x, b.y - m.y) < m.r + 4) {
+          b.dead = true;
+          splitMeteorLocal(m);
+          break;
+        }
+      }
+    }
+    bullets = bullets.filter(b => !b.dead);
+
+    // --- friendly fire: my lasers vs other pilots' ships (host-enabled).
+    // I detect the hit against their ghost and tell them; they apply the damage.
+    if (friendlyFire && net) {
+      for (const b of bullets) {
+        if (b.dead) continue;
+        for (const id of peerIds()) {
+          const p = peers[id];
+          if (!p.alive || !p.hasPos || p.slot < 0) continue;
+          if (Math.hypot(b.x - p.x, b.y - p.y) < 16) {
+            b.dead = true;
+            net.sendPvp({}, id);
+            spawnExplosion(b.x, b.y, 6, SLOT_COLORS[p.slot]);
+            break;
+          }
+        }
+      }
+      bullets = bullets.filter(b => !b.dead);
+    }
+
     // --- me vs enemies / enemy fire
     if (player.alive && player.invuln <= 0) {
       let hurt = false;
@@ -1605,6 +1808,15 @@
           if (Math.hypot(b.x - player.x, b.y - player.y) < player.r) {
             hurt = true;
             b.dead = true;
+            break;
+          }
+        }
+      }
+      if (!hurt) {
+        for (const m of meteors) {
+          if (Math.hypot(m.x - player.x, m.y - player.y) < m.r + player.r) {
+            hurt = true;
+            shatterMeteorLocal(m); // ram shatters it, no shards, no score
             break;
           }
         }
@@ -1849,6 +2061,27 @@
     }
   }
 
+  function drawMeteor(m) {
+    ctx.save();
+    ctx.translate(m.x, m.y);
+    ctx.rotate(m.rot);
+    ctx.beginPath();
+    const n = m.shape.length;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2, rr = m.r * m.shape[i];
+      const px = Math.cos(a) * rr, py = Math.sin(a) * rr;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(188, 188, 196, 0.16)';
+    ctx.fill();
+    ctx.strokeStyle = GRAY;
+    ctx.lineWidth = 1.4;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // callsign pill: player-color background, fully rounded, white text
   function drawNamePill(g, x, y, text, color, alpha) {
     g.save();
@@ -2014,6 +2247,8 @@
       drawTargetBrackets(nearest);
     }
 
+    for (const m of meteors) drawMeteor(m);
+
     for (const e of enemies) {
       drawTIE(e);
       if (e.maxHp > 1) drawHpBar(e);
@@ -2095,6 +2330,7 @@
 
   function applyModeUI() {
     document.getElementById('mode-chip').textContent = mode === 'zero' ? 'Zero G' : 'Trench Run';
+    document.getElementById('ff-chip').style.display = friendlyFire ? 'flex' : 'none';
     document.getElementById('controls-panel').innerHTML = mode === 'zero'
       ? '<span><span class="key">&#9664;</span><span class="key">&#9654;</span>&nbsp; rotate</span>' +
         '<span><span class="key">&#9650;</span>&nbsp; thrust &nbsp;<span class="key">&#9660;</span>&nbsp; reverse</span>' +
@@ -2119,6 +2355,18 @@
   }
   document.getElementById('mode-classic').addEventListener('click', () => { ensureAudio(); chooseMode('classic'); });
   document.getElementById('mode-zero').addEventListener('click', () => { ensureAudio(); chooseMode('zero'); });
+
+  const ffToggle = document.getElementById('ff-toggle');
+  function updateFFToggle() {
+    ffToggle.classList.toggle('on', friendlyFire);
+    ffToggle.setAttribute('aria-checked', friendlyFire ? 'true' : 'false');
+  }
+  ffToggle.addEventListener('click', () => {
+    friendlyFire = !friendlyFire;
+    writeHash();
+    updateFFToggle();
+  });
+  updateFFToggle();
 
   function toHangar() {
     if (stage !== 'name') return;
