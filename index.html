@@ -4,6 +4,16 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>Sweet Spaceship</title>
+
+<!-- installable app: Android/Chrome reads the manifest, iOS the apple-* tags -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#FF76A2" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Sweet Spaceship" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
 <style>
   :root {
     --pink: #FF76A2;
@@ -71,8 +81,8 @@
 
   /* score + hearts — top left */
   #score-panel {
-    top: 20px;
-    left: 20px;
+    top: calc(env(safe-area-inset-top, 0px) + 20px);
+    left: calc(env(safe-area-inset-left, 0px) + 20px);
     padding: 12px 18px;
     display: flex;
     gap: 24px;
@@ -105,8 +115,8 @@
 
   /* top-right controls */
   #top-controls {
-    top: 20px;
-    right: 20px;
+    top: calc(env(safe-area-inset-top, 0px) + 20px);
+    right: calc(env(safe-area-inset-right, 0px) + 20px);
     display: flex;
     gap: 10px;
   }
@@ -226,8 +236,8 @@
 
   /* controls hint — bottom left (keyboard devices only) */
   #controls-panel {
-    bottom: 20px;
-    left: 20px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+    left: calc(env(safe-area-inset-left, 0px) + 20px);
     padding: 12px 18px;
     display: flex;
     gap: 18px;
@@ -252,6 +262,7 @@
   }
   @media (pointer: coarse) {
     #controls-panel { display: none; }
+    #launch-hint-row { display: none; } /* touch users get the Play button */
   }
 
   /* respawn chip — center */
@@ -318,6 +329,12 @@
     opacity: 1;
     transition: opacity 0.4s ease;
     overflow-y: auto;
+    /* keep cards clear of the notch / home indicator in landscape */
+    padding:
+      calc(env(safe-area-inset-top, 0px) + 14px)
+      calc(env(safe-area-inset-right, 0px) + 14px)
+      calc(env(safe-area-inset-bottom, 0px) + 14px)
+      calc(env(safe-area-inset-left, 0px) + 14px);
   }
   .overlay.hidden { opacity: 0; pointer-events: none; }
 
@@ -325,8 +342,9 @@
     text-align: center;
     padding: 36px 44px;
     max-width: 470px;
-    width: calc(100% - 40px);
-    margin: 20px;
+    width: 100%;
+    /* auto margins centre the card when it fits and let it scroll when it doesn't */
+    margin: auto;
     animation: card-in 0.5s ease both;
   }
   @keyframes card-in {
@@ -690,15 +708,49 @@
 
   /* compact HUD on small screens */
   @media (max-width: 760px), (max-height: 480px) {
-    #score-panel { top: 12px; left: 12px; padding: 8px 14px; gap: 16px; border-radius: 14px; }
+    #score-panel {
+      top: calc(env(safe-area-inset-top, 0px) + 12px);
+      left: calc(env(safe-area-inset-left, 0px) + 12px);
+      padding: 8px 14px; gap: 16px; border-radius: 14px;
+    }
     .stat-value { font-size: 16px; }
     #hearts { font-size: 14px; }
-    #top-controls { top: 12px; right: 12px; }
+    #top-controls {
+      top: calc(env(safe-area-inset-top, 0px) + 12px);
+      right: calc(env(safe-area-inset-right, 0px) + 12px);
+    }
     .icon-btn { width: 38px; height: 38px; }
     .overlay-card { padding: 26px 24px; }
     .overlay-title { font-size: 22px; }
     .overlay-sub { font-size: 12px; margin-bottom: 14px; }
     .final-stats { gap: 22px; }
+  }
+
+  /* Landscape phones are only ~390-430px tall — squeeze the modals so they
+     never run past the top and bottom of the screen. */
+  @media (max-height: 560px) {
+    .overlay-card { padding: 16px 22px; }
+    .overlay-title { font-size: 19px; margin-bottom: 6px; }
+    .overlay-title.brand { margin-bottom: 8px; }
+    .overlay-sub { font-size: 11.5px; line-height: 1.45; margin-bottom: 11px; }
+    #preview-wrap { width: 180px; margin-bottom: 10px; }
+    #preview-canvas { width: 170px; height: 108px; }
+    .color-arrow { width: 28px; height: 28px; font-size: 15px; }
+    #callsign-row { margin-bottom: 11px; }
+    #callsign-input { padding: 6px 12px; }
+    #room-row { margin-bottom: 10px; gap: 8px; }
+    #room-code, #mode-chip, #ff-chip, #copy-btn { padding: 7px 12px; }
+    #lobby-players { margin-bottom: 10px; min-height: 0; }
+    .lobby-chip { padding: 4px 10px; }
+    #relay-status { margin-bottom: 10px; }
+    .mode-btn { padding: 12px 14px; min-width: 148px; }
+    .mode-name { font-size: 14px; margin-bottom: 4px; }
+    .mode-desc { font-size: 11px; line-height: 1.4; }
+    .ff-toggle { margin-top: 12px; padding: 6px 12px; }
+    .btn { padding: 10px 22px; }
+    #pause-standings { margin-bottom: 12px; }
+    .pause-icons { margin-bottom: 12px; }
+    .squad-row { padding: 3px 0; }
   }
 </style>
 </head>
@@ -815,7 +867,12 @@
     </div>
     <div id="lobby-players"></div>
     <div id="relay-status"><span id="relay-dot"></span><span id="relay-text">Linking relay network…</span></div>
-    <div class="overlay-hint"><span class="pulse" id="launch-hint">Press any key to launch</span></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="play-btn">Play</button>
+    </div>
+    <div class="overlay-hint" id="launch-hint-row" style="margin-top:12px">
+      <span id="launch-hint">or press Enter</span>
+    </div>
   </div>
 </div>
 
@@ -2337,11 +2394,6 @@
         '<span><span class="key" style="min-width:52px">SPACE</span>&nbsp; to fire</span>'
       : '<span><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span>&nbsp; or arrows to fly</span>' +
         '<span><span class="key" style="min-width:52px">SPACE</span>&nbsp; to fire</span>';
-    if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
-      document.getElementById('launch-hint').textContent = mode === 'zero'
-        ? 'Tap to launch — drag left to steer & thrust, tap right to fire'
-        : 'Tap to launch — drag left to fly, tap right to fire';
-    }
   }
 
   function chooseMode(m) {
@@ -2540,7 +2592,7 @@
       return;
     }
     if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
-    if (!running) { startGame(); return; }
+    if (!running) { if (e.key === 'Enter') startGame(); return; }
     if (paused) {
       if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') closePause();
       return; // only a specific key resumes — no more "any key"
@@ -2559,7 +2611,7 @@
 
   canvas.addEventListener('pointerdown', (e) => {
     ensureAudio();
-    if (!running) { startGame(); return; }
+    if (!running) return;  // launching is the Play button's job
     if (paused) return; // resume via the Resume button, not a tap anywhere
     if (finished || !player.alive) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -2596,9 +2648,10 @@
   window.addEventListener('pointerup', releasePointer);
   window.addEventListener('pointercancel', releasePointer);
 
-  // tap anywhere on lobby to launch (except interactive elements)
-  startOverlay.addEventListener('pointerdown', (e) => {
-    if (['INPUT', 'BUTTON'].includes(e.target.tagName)) return;
+  // The lobby launches only from the Play button (or Enter). Tapping anywhere
+  // used to start the game, which fired accidentally when you tapped Copy link
+  // or came back from the share sheet.
+  document.getElementById('play-btn').addEventListener('click', () => {
     ensureAudio();
     startGame();
   });
