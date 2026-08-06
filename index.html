@@ -16,6 +16,12 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
 <style>
   :root {
+    /* screen insets, indirected so the rotated stage can remap them */
+    --sa-top: env(safe-area-inset-top, 0px);
+    --sa-right: env(safe-area-inset-right, 0px);
+    --sa-bottom: env(safe-area-inset-bottom, 0px);
+    --sa-left: env(safe-area-inset-left, 0px);
+
     --pink: #FF76A2;
     --pink-soft: #FFA8C4;
     --pink-fade: #FFD9E6;
@@ -58,6 +64,27 @@
     touch-action: none;
   }
 
+  /* ---------- portrait auto-rotate ----------
+     iOS exposes no orientation lock to web apps, so on a portrait phone we
+     turn the entire game 90° instead of nagging the player to rotate. Sized
+     in JS (100vw/vh are unreliable on iOS). The stage's own top edge then
+     sits along the screen's right edge, so the safe-area insets rotate too. */
+  #stage {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transform-origin: 0 0;
+  }
+  body.rot #stage { transform: rotate(90deg); }
+  body.rot {
+    --sa-top: env(safe-area-inset-right, 0px);
+    --sa-right: env(safe-area-inset-bottom, 0px);
+    --sa-bottom: env(safe-area-inset-left, 0px);
+    --sa-left: env(safe-area-inset-top, 0px);
+  }
+
   /* ---------- glass chrome ---------- */
 
   .glass {
@@ -81,8 +108,8 @@
 
   /* score + hearts — top left */
   #score-panel {
-    top: calc(env(safe-area-inset-top, 0px) + 20px);
-    left: calc(env(safe-area-inset-left, 0px) + 20px);
+    top: calc(var(--sa-top) + 20px);
+    left: calc(var(--sa-left) + 20px);
     padding: 12px 18px;
     display: flex;
     gap: 24px;
@@ -115,8 +142,8 @@
 
   /* top-right controls */
   #top-controls {
-    top: calc(env(safe-area-inset-top, 0px) + 20px);
-    right: calc(env(safe-area-inset-right, 0px) + 20px);
+    top: calc(var(--sa-top) + 20px);
+    right: calc(var(--sa-right) + 20px);
     display: flex;
     gap: 10px;
   }
@@ -236,8 +263,8 @@
 
   /* controls hint — bottom left (keyboard devices only) */
   #controls-panel {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
-    left: calc(env(safe-area-inset-left, 0px) + 20px);
+    bottom: calc(var(--sa-bottom) + 20px);
+    left: calc(var(--sa-left) + 20px);
     padding: 12px 18px;
     display: flex;
     gap: 18px;
@@ -331,10 +358,10 @@
     overflow-y: auto;
     /* keep cards clear of the notch / home indicator in landscape */
     padding:
-      calc(env(safe-area-inset-top, 0px) + 14px)
-      calc(env(safe-area-inset-right, 0px) + 14px)
-      calc(env(safe-area-inset-bottom, 0px) + 14px)
-      calc(env(safe-area-inset-left, 0px) + 14px);
+      calc(var(--sa-top) + 14px)
+      calc(var(--sa-right) + 14px)
+      calc(var(--sa-bottom) + 14px)
+      calc(var(--sa-left) + 14px);
   }
   .overlay.hidden { opacity: 0; pointer-events: none; }
 
@@ -679,45 +706,18 @@
   }
   .check-ring svg { width: 26px; height: 26px; }
 
-  /* rotate prompt — touch devices in portrait */
-  #rotate-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 40;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    background: rgba(250, 250, 252, 0.92);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-  }
-  @media (orientation: portrait) and (pointer: coarse) {
-    #rotate-overlay { display: flex; }
-  }
-  #rotate-overlay .overlay-title { font-size: 20px; }
-  #rotate-icon {
-    font-size: 34px;
-    margin-bottom: 14px;
-    display: inline-block;
-    animation: tilt 1.8s ease-in-out infinite;
-  }
-  @keyframes tilt {
-    0%, 55%, 100% { transform: rotate(0deg); }
-    25%, 40%      { transform: rotate(90deg); }
-  }
-
   /* compact HUD on small screens */
   @media (max-width: 760px), (max-height: 480px) {
     #score-panel {
-      top: calc(env(safe-area-inset-top, 0px) + 12px);
-      left: calc(env(safe-area-inset-left, 0px) + 12px);
+      top: calc(var(--sa-top) + 12px);
+      left: calc(var(--sa-left) + 12px);
       padding: 8px 14px; gap: 16px; border-radius: 14px;
     }
     .stat-value { font-size: 16px; }
     #hearts { font-size: 14px; }
     #top-controls {
-      top: calc(env(safe-area-inset-top, 0px) + 12px);
-      right: calc(env(safe-area-inset-right, 0px) + 12px);
+      top: calc(var(--sa-top) + 12px);
+      right: calc(var(--sa-right) + 12px);
     }
     .icon-btn { width: 38px; height: 38px; }
     .overlay-card { padding: 26px 24px; }
@@ -755,6 +755,10 @@
 </style>
 </head>
 <body>
+
+<!-- Everything lives in #stage so portrait phones can be handled by rotating
+     the whole game 90° (iOS gives web apps no way to lock orientation). -->
+<div id="stage">
 
 <canvas id="game"></canvas>
 
@@ -812,7 +816,7 @@
     <div class="overlay-sub">Pick your mission — your friends join whichever you choose.</div>
     <div id="mode-row">
       <button class="mode-btn" id="mode-classic">
-        <span class="mode-name">Trench Run</span>
+        <span class="mode-name">Frontline</span>
         <span class="mode-desc">The classic run. Enemy ships sweep in from the right — hold the line.</span>
       </button>
       <button class="mode-btn" id="mode-zero">
@@ -860,7 +864,7 @@
       Most ships destroyed tops the leaderboard.
     </div>
     <div id="room-row">
-      <div id="mode-chip">Trench Run</div>
+      <div id="mode-chip">Frontline</div>
       <div id="ff-chip" style="display:none">Friendly fire</div>
       <div id="room-code">·····</div>
       <button id="copy-btn">Copy invite link</button>
@@ -912,14 +916,7 @@
   </div>
 </div>
 
-<!-- Rotate prompt -->
-<div id="rotate-overlay">
-  <div class="overlay-card glass">
-    <span id="rotate-icon">&#9707;</span>
-    <div class="overlay-title">Rotate your device</div>
-    <div class="overlay-sub" style="margin-bottom:0">This cockpit flies in landscape.</div>
-  </div>
-</div>
+</div><!-- /#stage -->
 
 <script src="trystero-nostr.js"></script>
 <script>
@@ -947,17 +944,46 @@
   const ctx = canvas.getContext('2d');
   let W = 0, H = 0, DPR = 1;
 
+  const stageEl = document.getElementById('stage');
+  let rotated = false;   // true when we're faking landscape on a portrait phone
+
   function resize() {
     DPR = Math.min(window.devicePixelRatio || 1, 2);
-    W = window.innerWidth;
-    H = window.innerHeight;
+    // when rotated the playfield's width runs down the screen, so swap
+    W = rotated ? window.innerHeight : window.innerWidth;
+    H = rotated ? window.innerWidth : window.innerHeight;
     canvas.width = W * DPR;
     canvas.height = H * DPR;
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   }
-  window.addEventListener('resize', resize);
-  window.addEventListener('orientationchange', () => setTimeout(resize, 300));
-  resize();
+
+  // Rotate the whole stage when a touch device is held in portrait. Android
+  // usually honours the manifest's orientation and never gets here; iOS has no
+  // orientation lock at all, so this is what makes the game playable there —
+  // including when the user has Portrait Orientation Lock switched on.
+  function applyOrientation() {
+    const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    rotated = !!coarse && window.innerHeight > window.innerWidth;
+    document.body.classList.toggle('rot', rotated);
+    if (rotated) {
+      stageEl.style.width = window.innerHeight + 'px';
+      stageEl.style.height = window.innerWidth + 'px';
+      stageEl.style.left = window.innerWidth + 'px';
+    } else {
+      stageEl.style.width = stageEl.style.height = stageEl.style.left = '';
+    }
+    resize();
+  }
+
+  // Pointer events arrive in page space; map them into stage space. With the
+  // stage rotated 90° about its top-left and pushed to the right edge:
+  //   page.x = innerWidth - stage.y   |   page.y = stage.x
+  function evX(e) { return rotated ? e.clientY : e.clientX; }
+  function evY(e) { return rotated ? window.innerWidth - e.clientX : e.clientY; }
+
+  window.addEventListener('resize', applyOrientation);
+  window.addEventListener('orientationchange', () => setTimeout(applyOrientation, 300));
+  applyOrientation();
 
   // ------------------------------------------------------------ audio
   let audioCtx = null;
@@ -1080,7 +1106,7 @@
   if (!roomId) roomId = makeRoomId();
 
   // game mode + friendly-fire flag travel in the invite link so the whole room
-  // shares them. 'classic' = Trench Run, 'zero' = Zero G. f=1 = friendly fire on.
+  // shares them. 'classic' = Frontline, 'zero' = Zero G. f=1 = friendly fire on.
   let mode = /(^|[#&])m=z/.test(location.hash) ? 'zero' : 'classic';
   let friendlyFire = /(^|[#&])f=1/.test(location.hash);
   function writeHash() {
@@ -1398,7 +1424,7 @@
     if (d.dx !== undefined) {            // Zero G: velocity vector
       e.vx = d.dx * d.v;
       e.vy = d.dy * d.v;
-    } else {                             // Trench Run: sine drift
+    } else {                             // Frontline: sine drift
       e.driftPhase = d.P;
       e.driftAmp = d.A;
     }
@@ -1760,7 +1786,7 @@
       if (e.vx !== undefined) {          // Zero G: straight line from any edge
         e.x += e.vx * dt;
         e.y += e.vy * dt;
-      } else {                           // Trench Run: sweep in from the right
+      } else {                           // Frontline: sweep in from the right
         e.x -= e.speed * dt;
         e.driftPhase += dt * 1.4;
         e.y += Math.sin(e.driftPhase) * e.driftAmp * dt;
@@ -2054,7 +2080,7 @@
   }
 
   // ------------------------------------------------------------ drawing
-  function drawTIE(e) {
+  function drawEnemy(e) {
     const { x, y, s } = e;
     ctx.save();
     ctx.translate(x, y);
@@ -2164,7 +2190,9 @@
     g.globalAlpha = 1;
   }
 
-  function drawShip(g, x, y, colors, bank, alpha) {
+  // lwScale lets a caller keep strokes an even weight when the ship is drawn
+  // into a scaled context (enemies render this same hull at other sizes)
+  function drawShip(g, x, y, colors, bank, alpha, lwScale = 1) {
     const s = 15;
     g.save();
     g.globalAlpha = alpha;
@@ -2172,7 +2200,7 @@
     g.rotate(bank);
     g.strokeStyle = colors.main;
     g.fillStyle = colors.main + '14'; // ~8% alpha tint of the player color
-    g.lineWidth = 1.6;
+    g.lineWidth = 1.6 * lwScale;
     g.lineJoin = 'round';
     g.beginPath();
     g.moveTo(s * 1.55, 0);
@@ -2192,7 +2220,7 @@
     g.fill();
     g.stroke();
     g.strokeStyle = colors.deep;
-    g.lineWidth = 1.2;
+    g.lineWidth = 1.2 * lwScale;
     g.beginPath(); g.moveTo(s * 0.55, 0); g.lineTo(s * 0.05, 0); g.stroke();
     for (const side of [-1, 1]) {
       g.beginPath();
@@ -2307,7 +2335,7 @@
     for (const m of meteors) drawMeteor(m);
 
     for (const e of enemies) {
-      drawTIE(e);
+      drawEnemy(e);
       if (e.maxHp > 1) drawHpBar(e);
     }
 
@@ -2386,7 +2414,7 @@
   let stage = isOriginal ? 'mode' : 'name'; // mode → name → lobby → flying
 
   function applyModeUI() {
-    document.getElementById('mode-chip').textContent = mode === 'zero' ? 'Zero G' : 'Trench Run';
+    document.getElementById('mode-chip').textContent = mode === 'zero' ? 'Zero G' : 'Frontline';
     document.getElementById('ff-chip').style.display = friendlyFire ? 'flex' : 'none';
     document.getElementById('controls-panel').innerHTML = mode === 'zero'
       ? '<span><span class="key">&#9664;</span><span class="key">&#9654;</span>&nbsp; rotate</span>' +
@@ -2441,6 +2469,12 @@
     player.labelT = 2.5;
     startOverlay.classList.add('hidden');
     ensureAudio();
+    // Android/Chrome can genuinely lock the device to landscape; iOS can't, and
+    // rejects — the CSS rotation covers that case, so failure is fine.
+    try {
+      const lock = screen.orientation && screen.orientation.lock;
+      if (lock) { const r = screen.orientation.lock('landscape'); if (r && r.catch) r.catch(() => {}); }
+    } catch (e) {}
     updateHearts();
     pushState();
   }
@@ -2615,12 +2649,12 @@
     if (paused) return; // resume via the Resume button, not a tap anywhere
     if (finished || !player.alive) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    if (e.clientX < W * 0.45) {
+    if (evX(e) < W * 0.45) {
       if (!stick.active) {
         stick.active = true;
         stick.id = e.pointerId;
-        stick.ox = e.clientX;
-        stick.oy = e.clientY;
+        stick.ox = evX(e);
+        stick.oy = evY(e);
         stick.dx = stick.dy = 0;
       }
     } else {
@@ -2632,8 +2666,8 @@
 
   window.addEventListener('pointermove', (e) => {
     if (stick.active && e.pointerId === stick.id) {
-      stick.dx = e.clientX - stick.ox;
-      stick.dy = e.clientY - stick.oy;
+      stick.dx = evX(e) - stick.ox;
+      stick.dy = evY(e) - stick.oy;
     }
   });
 

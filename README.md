@@ -1,15 +1,15 @@
 # Sweet Spaceship
 
 A minimalist multiplayer space shooter in white and glass. Fly a wireframe
-starfighter, clear waves of gray TIE-style ships straight out of the
-*A New Hope* targeting computer, and race up to three friends on the
-leaderboard — most ships destroyed wins.
+starfighter, clear waves of grey enemy interceptors rendered as vector
+outlines, and race up to three friends on the leaderboard — most ships
+destroyed wins.
 
 ## Game modes
 
 The room creator picks the mission; everyone who joins the link plays it.
 
-- **Trench Run** — the classic run. Enemies sweep in from the right; fly
+- **Frontline** — the classic run. Enemies sweep in from the right; fly
   freely in all directions and hold the line.
 - **Zero G** — rotate & thrust. Left/right turn the ship, up thrusts,
   down reverse-thrusts, and momentum carries you when you let go. No
